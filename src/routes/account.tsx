@@ -142,7 +142,51 @@ function ProfileForm({name,email,onSaved}:{name:string;email:string;onSaved:()=>
 }
 function SecurityForm({email}:{email:string}){
  const [cur,setCur]=useState('');const [next,setNext]=useState('');const [err,setErr]=useState('');const [ok,setOk]=useState('');
- return <form onSubmit={e=>{e.preventDefault();void (async()=>{const r=await changePassword(email,cur,next);if(r.error){setErr(r.error);setOk('');}else{setErr('');setOk('Password changed.');setCur('');setNext('');}})();}}><h2>Security</h2><label className="form-field">Current password<input type="password" value={cur} onChange={e=>setCur(e.target.value)} autoComplete="current-password"/></label><label className="form-field">New password<input type="password" value={next} onChange={e=>setNext(e.target.value)} autoComplete="new-password"/></label>{err&&<p className="field-error" role="alert">{err}</p>}{ok&&<p className="field-ok" role="status">{ok}</p>}<Button variant="fashion" type="submit">CHANGE PASSWORD</Button></form>;
+ const [showCur,setShowCur]=useState(false);const [showNext,setShowNext]=useState(false);
+ const passLength = next.length >= 8;
+ const passHasLetter = /[a-zA-Z]/.test(next);
+ const passHasNumber = /\d/.test(next);
+ return <form onSubmit={e=>{e.preventDefault();void (async()=>{const r=await changePassword(email,cur,next);if(r.error){setErr(r.error);setOk('');}else{setErr('');setOk('Password changed successfully.');setCur('');setNext('');}})();}}>
+  <h2>Security</h2>
+  <div className="form-field">
+    <label htmlFor="cur-pass">Current password</label>
+    <div style={{position:'relative',display:'flex',alignItems:'center'}}>
+      <input id="cur-pass" type={showCur ? 'text' : 'password'} value={cur} onChange={e=>setCur(e.target.value)} autoComplete="current-password" required style={{width:'100%',paddingRight:'40px'}}/>
+      <button type="button" onClick={()=>setShowCur(!showCur)} aria-label={showCur ? "Hide password" : "Show password"} tabIndex={-1} style={{position:'absolute',right:'10px',background:'none',border:'none',cursor:'pointer',padding:'4px',display:'grid',placeItems:'center',color:'var(--muted-foreground)'}}>
+        {showCur ? <EyeOff size={16} /> : <Eye size={16} />}
+      </button>
+    </div>
+  </div>
+  <div className="form-field">
+    <label htmlFor="next-pass">New password</label>
+    <div style={{position:'relative',display:'flex',alignItems:'center'}}>
+      <input id="next-pass" type={showNext ? 'text' : 'password'} value={next} onChange={e=>setNext(e.target.value)} autoComplete="new-password" required style={{width:'100%',paddingRight:'40px'}}/>
+      <button type="button" onClick={()=>setShowNext(!showNext)} aria-label={showNext ? "Hide password" : "Show password"} tabIndex={-1} style={{position:'absolute',right:'10px',background:'none',border:'none',cursor:'pointer',padding:'4px',display:'grid',placeItems:'center',color:'var(--muted-foreground)'}}>
+        {showNext ? <EyeOff size={16} /> : <Eye size={16} />}
+      </button>
+    </div>
+    {next.length>0&&(
+      <div style={{marginTop:'8px',padding:'10px 12px',background:'var(--secondary)',border:'1px solid var(--border)',fontSize:'11px',display:'flex',flexDirection:'column',gap:'5px'}} role="status">
+        <span style={{fontWeight:600,color:'var(--foreground)'}}>Password requirements:</span>
+        <div style={{display:'flex',alignItems:'center',gap:'6px',color:passLength?'#1d7a3a':'var(--muted-foreground)'}}>
+          {passLength ? <Check size={13} strokeWidth={2.5}/> : <X size={13}/>}
+          <span>At least 8 characters ({next.length}/8)</span>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:'6px',color:passHasLetter?'#1d7a3a':'var(--muted-foreground)'}}>
+          {passHasLetter ? <Check size={13} strokeWidth={2.5}/> : <X size={13}/>}
+          <span>Contains at least one letter</span>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:'6px',color:passHasNumber?'#1d7a3a':'var(--muted-foreground)'}}>
+          {passHasNumber ? <Check size={13} strokeWidth={2.5}/> : <X size={13}/>}
+          <span>Contains at least one number</span>
+        </div>
+      </div>
+    )}
+  </div>
+  {err&&<p className="field-error" role="alert">{err}</p>}
+  {ok&&<p className="field-ok" role="status">{ok}</p>}
+  <Button variant="fashion" type="submit" style={{marginTop:'12px'}}>CHANGE PASSWORD</Button>
+ </form>;
 }
 function AddressBook({user,onChange}:{user:SessionUser;onChange:(u:SessionUser|null)=>void}){
  const [open,setOpen]=useState(false);
