@@ -92,10 +92,19 @@ function Checkout(){
         clearPendingPromo();clearBag();
         navigate({to:'/order-success',search:{order:order.id,email:details.email.trim().toLowerCase()}});
       }catch(err){
+        // Shopper-safe messages only: server trigger texts (stock/discount)
+        // are written for display; everything else stays generic so no
+        // implementation detail leaks. The full error always goes to the
+        // console for diagnosis when shoppers report the generic message.
         const msg=err instanceof Error?err.message:'';
-        const friendly=/only \d+ left|not valid|minimum spend|usage limit|no items|invalid order|no longer available|already used/i.test(msg)
-          ?msg:'Could not place your order. Please try again.';
-        setErrors({stock:friendly});
+        try{console.error('[checkout] order failed:',msg);}catch{/* ignore */}
+        if(/failed to fetch|networkerror|load failed|timeout|network request failed/i.test(msg)){
+          setErrors({stock:'No connection to the store. Check your internet and try again — your bag is kept.'});
+        }else{
+          const friendly=/only \d+ left|not valid|minimum spend|usage limit|no items|invalid order|no longer available|already used/i.test(msg)
+            ?msg:'Could not place your order. Please try again.';
+          setErrors({stock:friendly});
+        }
       }finally{setIsPlacing(false);}})();
   }
 

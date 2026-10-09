@@ -122,8 +122,8 @@ export function initRealtime(handlers?: {
       );
 
     // 2. Listen for Instant Multi-Device Broadcast Events (<50ms delivery)
-    channel.on('broadcast', { event: 'store_broadcast' }, (payload) => {
-      const type = payload?.payload?.type as StoreEventType | undefined;
+    channel.on('broadcast', { event: 'store_broadcast' }, (payload: { payload?: { type?: StoreEventType } }) => {
+      const type = payload?.payload?.type;
       if (!type) return;
 
       if (type === 'products:changed') handlers?.onProductsSync?.();
