@@ -66,7 +66,7 @@ function Account(){
    if(mode==='forgot'){const r=await resetPassword(email);if(r.error)setError(r.error);else setNotice(isDemoMode()?'If an account exists for this email, a reset link is on its way (demo — no email is sent).':'Check your inbox — if an account exists for this email, a reset link is on its way.');return;}
    const r=mode==='register'?await register({name,email,password}):await login({email,password});
    if(r.error){setError(r.error);setPendingVerify('');}
-   else if(r.needsVerification){setPendingVerify(email);setNotice('Account created — check your inbox to verify your email, then sign in.');setMode('signin');setPassword('');}
+    else if(r.needsVerification){setPendingVerify(email);setNotice(`Account created — we sent a verification link to ${email}. Open it, then sign in.`);setMode('signin');setPassword('');}
    else{setPendingVerify('');setPassword('');await refresh();}
   }finally{setBusy(false);}
  }

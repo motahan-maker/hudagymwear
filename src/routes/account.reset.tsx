@@ -82,11 +82,20 @@ function Reset(){
   return ()=>{live=false;window.clearTimeout(t);subscription.unsubscribe();};
  },[]);
 
- async function submit(e:React.FormEvent){
-  e.preventDefault();if(busy||status!=='ready')return;setError('');
-  if(next.length < 8){setError('Password must be at least 8 characters.');return;}
-  if(next!==again){setError('Passwords do not match.');return;}
-  setBusy(true);
+  async function submit(e:React.FormEvent){
+   e.preventDefault();if(busy||status!=='ready')return;setError('');
+   if(next.length < 8){setError('Password must be at least 8 characters.');return;}
+   if(next!==again){setError('Passwords do not match.');return;}
+   setBusy(true);
+   // The form can render from URL tokens before the session exchange
+   // finishes — never submit blindly, or users get raw "Auth session missing".
+   const sb=getSupabase();
+   const {data:{session}}=sb?await sb.auth.getSession():{data:{session:null}};
+   if(!session){
+    setBusy(false);
+    setError('This reset link has expired or was already used. Request a fresh link from sign-in, and open it in the same browser.');
+    return;
+   }
   const r=await updatePassword(next);
   if(r.error){
     setBusy(false);

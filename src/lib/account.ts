@@ -195,6 +195,12 @@ export async function register(input: { name: string; email: string; password: s
     }
     return { error: error.message };
   }
+  // Supabase returns SUCCESS (no error, no session, no new email) when the
+  // address is already registered — the only signal is an empty identities
+  // list. Without this check, existing users get a misleading "check inbox".
+  if (!data.user || (data.user.identities?.length ?? 0) === 0) {
+    return { error: 'An account with this email already exists. Try signing in.' };
+  }
   // Email confirmation ON (recommended) => no session yet.
   if (!data.session) return { needsVerification: true };
   await claimGuestOrders();
@@ -291,7 +297,20 @@ export async function resendVerification(email?: string): Promise<{ error?: stri
     email: addr,
     options: { emailRedirectTo: `${window.location.origin}/account` },
   });
-  if (error) return { error: error.message };
+  if (error) {
+    // "Error sending confirmation email" = the project's SMTP (e.g. Resend)
+    // rejected the send — translate to something actionable, keep the rest raw.
+    if (/already confirmed|already verified/i.test(error.message)) {
+      return { error: 'This email is already verified — please sign in.' };
+    }
+    if (/rate limit|too many requests|after .* seconds?/i.test(error.message)) {
+      return { error: 'Too many attempts — wait a minute and try again.' };
+    }
+    if (/sending|send.*fail|SMTP|mailer/i.test(error.message)) {
+      return { error: 'Email service is unavailable right now. Please try again in a few minutes.' };
+    }
+    return { error: error.message };
+  }
   return {};
 }
 
