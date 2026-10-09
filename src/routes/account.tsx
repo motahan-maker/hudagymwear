@@ -4,6 +4,7 @@ import { ArrowRight, MapPin, Package, Heart, LogOut, Plus, Trash2, Eye, EyeOff, 
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { pageHead, money } from '@/lib/catalog';
+import { getSupabase } from '@/lib/supabase';
 import { getSessionUser, register, login, logout, signInWithGoogle, resendVerification, updateProfile, changePassword, resetPassword, saveAddress, deleteAddress, exportUserData, deleteAccount, isDemoMode, onAuthChange, claimGuestOrders, migrateLocalData, type Address, type SessionUser } from '@/lib/account';
 import { UK_PLACES, OTHER_CITY, isListedCity } from '@/lib/uk-places';
 import { ordersByEmail, type Order } from '@/lib/orders';
@@ -25,6 +26,11 @@ function Account(){
  useEffect(()=>{
   let live=true;
   const params=new URLSearchParams(window.location.search);
+  const hashParams=new URLSearchParams(window.location.hash.replace(/^#/,''));
+  if(params.get('type')==='recovery'||hashParams.get('type')==='recovery'){
+    window.location.replace('/account/reset' + window.location.search + window.location.hash);
+    return;
+  }
   const cbError=params.get('error_description')||params.get('error');
   // Shopify-style clean URLs: drop one-time OAuth params after the exchange
   // so refresh/bookmark never replays them.
