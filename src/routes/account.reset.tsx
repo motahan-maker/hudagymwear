@@ -37,10 +37,48 @@ function Reset(){
    return;
   }
   let live=true;
-  sb.auth.getSession().then(({data})=>{if(live&&data.session)setStatus('ready');});
-  const {data:{subscription}}=sb.auth.onAuthStateChange((ev, session)=>{if(live&&(ev==='PASSWORD_RECOVERY'||(ev==='SIGNED_IN'&&!!session)))setStatus('ready');});
-  // If no session arrives shortly, the link is expired or already used.
-  const t=window.setTimeout(()=>{if(live)setStatus((s)=>{if(s==='checking'){setExpiredReason('This reset link has expired or was already used.');return 'expired';}return s;});},4000);
+  // Check if link carries recovery token in query or hash fragment
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const code = params.get("code");
+  const hasToken = !!code || params.has("token") || hashParams.has("access_token") || hashParams.get("type") === "recovery";
+  
+  if (hasToken) {
+    // Show form immediately if recovery token/params are present in URL
+    setStatus("ready");
+  }
+
+  // If Supabase uses PKCE (?code=...), exchange it immediately for a valid session
+  if (code) {
+    sb.auth.exchangeCodeForSession(code).then(({ data, error }) => {
+      if (!error && data.session && live) {
+        setStatus("ready");
+      }
+    }).catch(() => {/* handled by auth listener */});
+  }
+
+  sb.auth.getSession().then(({data})=>{
+    if(live && data.session) setStatus("ready");
+  });
+
+  const {data:{subscription}}=sb.auth.onAuthStateChange((ev, session)=>{
+    if(live && (ev==='PASSWORD_RECOVERY' || ev==='USER_UPDATED' || (ev==='SIGNED_IN'&&!!session))) {
+      setStatus("ready");
+    }
+  });
+
+  const t=window.setTimeout(()=>{
+    if(live) {
+      setStatus((s)=>{
+        if(s==='checking') {
+          // If we have token in URL, allow them to attempt password reset rather than failing
+          if(hasToken) return "ready";
+          setExpiredReason("This reset link has expired or was already used.");
+          return "expired";
+        }
+        return s;
+      });
+    }
+  }, 3000);
   return ()=>{live=false;window.clearTimeout(t);subscription.unsubscribe();};
  },[]);
 

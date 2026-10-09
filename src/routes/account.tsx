@@ -49,7 +49,7 @@ function Account(){
    // hold the loading state until the auth event (or a timeout) resolves it.
    const awaitingCode=params.has('code');
    getSessionUser().then(u=>{if(live){setUser(u);if(!awaitingCode)setLoading(false);stripAuthParams();}});
-   if(awaitingCode)window.setTimeout(()=>{if(live)setLoading(false);},8000);
+   window.setTimeout(()=>{if(live)setLoading(false);}, 2000);
   }
   return onAuthChange(u=>{setUser(u);setLoading(false);stripAuthParams();});
  },[]);
