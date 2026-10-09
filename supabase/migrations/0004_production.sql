@@ -186,7 +186,7 @@ declare
   sub numeric := 0; disc numeric := 0; ship numeric := 0;
   code text;
   dkind text; dval numeric; dmin numeric; dmax int; duses int;
-  ship_json jsonb; free_over numeric;
+  ship_json jsonb; v_free_over numeric;
   m jsonb; method_label text; chosen_label text;
 begin
   if new.items is null or jsonb_array_length(new.items) = 0 then
@@ -252,8 +252,8 @@ begin
   end if;
 
   -- 3. Shipping recomputed from the live settings row.
-  select shipping, free_over into ship_json, free_over
-    from public.shop_settings where id = 1;
+  select ss.shipping, ss.free_over into ship_json, v_free_over
+    from public.shop_settings ss where ss.id = 1;
   method_label := new.shipping ->> 'method';
   chosen_label := method_label;
   ship := coalesce((new.shipping ->> 'price')::numeric, 0);
@@ -261,7 +261,7 @@ begin
     for m in select * from jsonb_array_elements(ship_json) loop
       if (m ->> 'enabled')::boolean and lower(m ->> 'label') = lower(coalesce(method_label, '')) then
         chosen_label := m ->> 'label';
-        if (m ->> 'id') = 'standard' and (sub - disc) >= coalesce(free_over, 0) then
+        if (m ->> 'id') = 'standard' and (sub - disc) >= coalesce(v_free_over, 0) then
           ship := 0;
         else
           ship := coalesce((m ->> 'price')::numeric, 0);
