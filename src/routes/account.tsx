@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, MapPin, Package, Heart, LogOut, Plus, Trash2 } from 'lucide-react';
+import { ArrowRight, MapPin, Package, Heart, LogOut, Plus, Trash2, Eye, EyeOff, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { pageHead, money } from '@/lib/catalog';
@@ -15,6 +15,7 @@ function Account(){
  const [loading,setLoading]=useState(true);
  const [mode,setMode]=useState<'signin'|'register'|'forgot'>('signin');
  const [name,setName]=useState('');const [email,setEmail]=useState('');const [password,setPassword]=useState('');
+ const [showPass,setShowPass]=useState(false);
  const [error,setError]=useState('');const [notice,setNotice]=useState('');const [busy,setBusy]=useState(false);
  const [pendingVerify,setPendingVerify]=useState('');
  const [tab,setTab]=useState<'orders'|'addresses'|'profile'|'security'>('orders');
@@ -68,7 +69,59 @@ function Account(){
  async function resend(addr?:string){const r=await resendVerification(addr);if(r.error)toast.error(r.error);else toast.success('Verification email sent — check your inbox.');}
  if(loading)return <div className="page-wrap"><p className="fine-print">Loading your account…</p></div>;
  if(!user)return <><div className="page-wrap"><Breadcrumbs items={[{label:'Home',to:'/'},{label:'Your Account'}]}/></div><div className="page-header"><span className="eyebrow">YOUR WORLD. YOUR HUDA.</span><h1>Your Account</h1><p>A space for your favourites, orders and next chapter.</p></div><div className="account-box"><div className="account-tabs" role="tablist" aria-label="Account access"><Button variant="quiet" className={mode==='signin'?'selected':''} aria-pressed={mode==='signin'} onClick={()=>{setMode('signin');setError('');setNotice('');}}>Sign in</Button><Button variant="quiet" className={mode==='register'?'selected':''} aria-pressed={mode==='register'} onClick={()=>{setMode('register');setError('');setNotice('');}}>Create account</Button></div>
- <form onSubmit={submit}>{mode==='register'&&<label className="form-field">Your name<input value={name} onChange={e=>setName(e.target.value)} autoComplete="name" placeholder="Amelia Clarke"/></label>}<label className="form-field">Email address<input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" placeholder="you@example.co.uk"/></label>{mode!=='forgot'&&<label className="form-field">Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete={mode==='signin'?'current-password':'new-password'} placeholder="••••••••"/></label>}{error&&<p className="field-error" role="alert">{error}</p>}{notice&&<p className="field-ok" role="status">{notice}</p>}{pendingVerify&&!isDemoMode()&&<p className="fine-print">Didn't get it? <Button variant="link" size="sm" onClick={()=>resend(pendingVerify)}>RESEND VERIFICATION EMAIL</Button></p>}<Button variant="fashion" type="submit" disabled={busy}>{busy?'PLEASE WAIT…':mode==='signin'?'SIGN IN':mode==='register'?'CREATE ACCOUNT':'SEND RESET LINK'}</Button></form>
+ <form onSubmit={submit}>
+  {mode==='register'&&<label className="form-field">Your name<input value={name} onChange={e=>setName(e.target.value)} autoComplete="name" placeholder="Amelia Clarke" required/></label>}
+  <label className="form-field">Email address<input type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" placeholder="you@example.co.uk" required/></label>
+  {mode!=='forgot'&&(
+    <div className="form-field">
+      <label htmlFor="account-password">Password</label>
+      <div style={{position:'relative',display:'flex',alignItems:'center'}}>
+        <input
+          id="account-password"
+          type={showPass ? 'text' : 'password'}
+          value={password}
+          onChange={e=>setPassword(e.target.value)}
+          autoComplete={mode==='signin'?'current-password':'new-password'}
+          placeholder="••••••••"
+          required
+          style={{width:'100%',paddingRight:'40px'}}
+        />
+        <button
+          type="button"
+          onClick={()=>setShowPass(!showPass)}
+          aria-label={showPass ? "Hide password" : "Show password"}
+          tabIndex={-1}
+          style={{position:'absolute',right:'10px',background:'none',border:'none',cursor:'pointer',padding:'4px',display:'grid',placeItems:'center',color:'var(--muted-foreground)'}}
+        >
+          {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+        </button>
+      </div>
+      {mode==='register'&&password.length>0&&(
+        <div style={{marginTop:'8px',padding:'10px 12px',background:'var(--secondary)',border:'1px solid var(--border)',fontSize:'11px',display:'flex',flexDirection:'column',gap:'5px'}} role="status">
+          <span style={{fontWeight:600,color:'var(--foreground)'}}>Password requirements:</span>
+          <div style={{display:'flex',alignItems:'center',gap:'6px',color:password.length>=8?'#1d7a3a':'var(--muted-foreground)'}}>
+            {password.length>=8 ? <Check size={13} strokeWidth={2.5}/> : <X size={13}/>}
+            <span>At least 8 characters ({password.length}/8)</span>
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:'6px',color:/[a-zA-Z]/.test(password)?'#1d7a3a':'var(--muted-foreground)'}}>
+            {/[a-zA-Z]/.test(password) ? <Check size={13} strokeWidth={2.5}/> : <X size={13}/>}
+            <span>Contains at least one letter</span>
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:'6px',color:/\d/.test(password)?'#1d7a3a':'var(--muted-foreground)'}}>
+            {/\d/.test(password) ? <Check size={13} strokeWidth={2.5}/> : <X size={13}/>}
+            <span>Contains at least one number</span>
+          </div>
+        </div>
+      )}
+    </div>
+  )}
+  {error&&<p className="field-error" role="alert">{error}</p>}
+  {notice&&<p className="field-ok" role="status">{notice}</p>}
+  {pendingVerify&&!isDemoMode()&&<p className="fine-print">Didn't get it? <Button variant="link" size="sm" type="button" onClick={()=>resend(pendingVerify)}>RESEND VERIFICATION EMAIL</Button></p>}
+  <Button variant="fashion" type="submit" disabled={busy} style={{width:'100%',marginTop:'14px'}}>
+    {busy?'PLEASE WAIT…':mode==='signin'?'SIGN IN':mode==='register'?'CREATE ACCOUNT':'SEND RESET LINK'}
+  </Button>
+ </form>
  {!isDemoMode()&&mode!=='forgot'&&<><div className="flex items-center gap-3 my-4" aria-hidden="true"><span className="h-px flex-1 bg-black/10"/><span className="fine-print">or</span><span className="h-px flex-1 bg-black/10"/></div><Button variant="quiet" onClick={google} disabled={busy}><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M23.5 12.3c0-.9-.1-1.5-.3-2.3H12v4.5h6.5c-.1 1.1-.8 2.7-2.4 3.8l-.1.1 3.5 2.7.2.1c2.2-2 3.6-5 3.6-8.9z"/><path fill="#34A853" d="M12 24c3.2 0 5.9-1.1 7.9-2.9l-3.8-2.9c-1 .7-2.4 1.2-4.1 1.2-3.1 0-5.8-2.1-6.8-5l-.1.1-3.6 2.8v.1C3.5 21.3 7.5 24 12 24z"/><path fill="#FBBC05" d="M5.2 14.4c-.2-.7-.4-1.5-.4-2.4s.1-1.7.4-2.4l-.1-.1-3.6-2.8-.1.1C.5 8.7 0 10.3 0 12s.5 3.3 1.4 4.7l3.8-2.3z"/><path fill="#EA4335" d="M12 4.7c1.8 0 3 .8 3.7 1.4l3.3-3.2C17.9 1.1 15.2 0 12 0 7.5 0 3.5 2.7 1.4 6.8l3.8 3C6.2 6.8 8.9 4.7 12 4.7z"/></svg> CONTINUE WITH GOOGLE</Button></>}
  {mode==='signin'&&<Button variant="link" size="sm" onClick={()=>{setMode('forgot');setError('');setNotice('');}}>Forgot your password?</Button>}{mode==='forgot'&&<Button variant="link" size="sm" onClick={()=>{setMode('signin');setError('');setNotice('');}}>Back to sign in</Button>}
  <p className="fine-print">Secured accounts — your orders and addresses follow you on every device.</p></div></>;

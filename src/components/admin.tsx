@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from '@tanstack/react-router';
-import { LayoutDashboard, Package, ShoppingBag, Users, BarChart3, Settings, ArrowUpRight, ArrowLeft, Search, Bell, Plus, Pencil, Trash2, Menu, LogOut, Check, Boxes, Tags, BadgePercent, Lock, ImagePlus, X, Copy, Star, Mail } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingBag, Users, BarChart3, Settings, ArrowUpRight, ArrowLeft, Search, Bell, Plus, Pencil, Trash2, Menu, LogOut, Check, Boxes, Tags, BadgePercent, Lock, ImagePlus, X, Copy, Star, Mail, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { products, money, upsertProduct, deleteProduct, totalStock, sizeStock, slugify, tones, badges, sizes, productImage, productColours, getProduct, COLOUR_PRESETS, guessTone, presetFor, effectivePrice, type Product, type ProductColour, type ProductStatus } from '@/lib/catalog';
@@ -54,6 +54,7 @@ export function AdminGuard({ children }: { children: ReactNode }) {
 export function AdminLogin({ onDone }: { onDone?: () => void }) {
   const navigate = useNavigate();
   const [email, setEmail] = useState(''); const [password, setPassword] = useState(''); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
+  const [showPass, setShowPass] = useState(false);
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
@@ -78,7 +79,59 @@ export function AdminLogin({ onDone }: { onDone?: () => void }) {
       if (onDone) onDone(); else navigate({ to: '/admin' });
     } else { setError('Incorrect admin email or password.'); setBusy(false); }
   }
-  return <div className="admin-login-wrap"><div className="admin-login"><img src={logo.url} alt="HUDA GYMWEAR" /><h1>Brand Studio</h1><p>Sign in to manage your store.</p><form onSubmit={submit}><label className="form-field">Work email<input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={ADMIN_EMAIL} autoComplete="username" /></label><label className="form-field">Password<input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password" /></label>{error && <p className="field-error" role="alert">{error}</p>}<Button variant="fashion" type="submit" disabled={busy} className="w-full"><Lock size={14} /> {busy ? 'SIGNING IN…' : 'SIGN IN'}</Button></form>{isDemoMode() ? (import.meta.env.DEV ? <p className="fine-print">Demo access — email: {ADMIN_EMAIL} · password: {ADMIN_PASS}</p> : <p className="fine-print">Admin access is not configured on this store.</p>) : <p className="fine-print">Admin access comes from your account's role. First admin: sign up, then set role = 'admin' on your profile in Supabase.</p>}<Link to="/" className="text-link">← Back to storefront</Link></div></div>;
+  return (
+    <div className="admin-login-wrap">
+      <div className="admin-login">
+        <img src={logo.url} alt="HUDA GYMWEAR" />
+        <h1>Brand Studio</h1>
+        <p>Sign in to manage your store.</p>
+        <form onSubmit={submit}>
+          <label className="form-field">
+            Work email
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={ADMIN_EMAIL || 'admin@hudagymwear.com'} autoComplete="username" required />
+          </label>
+          <div className="form-field">
+            <label htmlFor="admin-pass">Password</label>
+            <div style={{position:'relative',display:'flex',alignItems:'center'}}>
+              <input
+                id="admin-pass"
+                type={showPass ? 'text' : 'password'}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••"
+                autoComplete="current-password"
+                required
+                style={{width:'100%',paddingRight:'40px'}}
+              />
+              <button
+                type="button"
+                onClick={()=>setShowPass(!showPass)}
+                aria-label={showPass ? "Hide password" : "Show password"}
+                tabIndex={-1}
+                style={{position:'absolute',right:'10px',background:'none',border:'none',cursor:'pointer',padding:'4px',display:'grid',placeItems:'center',color:'var(--muted-foreground)'}}
+              >
+                {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
+          {error && <p className="field-error" role="alert">{error}</p>}
+          <Button variant="fashion" type="submit" disabled={busy} className="w-full mt-2">
+            <Lock size={14} /> {busy ? 'SIGNING IN…' : 'SIGN IN'}
+          </Button>
+        </form>
+        {isDemoMode() ? (
+          import.meta.env.DEV ? (
+            <p className="fine-print">Demo access — email: {ADMIN_EMAIL} · password: {ADMIN_PASS}</p>
+          ) : (
+            <p className="fine-print">Admin access is not configured on this store.</p>
+          )
+        ) : (
+          <p className="fine-print">Production security: Access granted via Supabase Auth with verified <code>role = 'admin'</code>.</p>
+        )}
+        <Link to="/" className="text-link">← Back to storefront</Link>
+      </div>
+    </div>
+  );
 }
 
 // --- shell --------------------------------------------------------------------
