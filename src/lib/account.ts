@@ -50,7 +50,11 @@ export const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.tri
 
 function authRedirect(path: string): string {
   const configured = import.meta.env['VITE_SITE_URL'] as string | undefined;
-  const base = (configured?.trim() || window.location.origin).replace(/\/+$/, '');
+  const origin = window.location.origin;
+  const productionFallback = origin.endsWith('.vercel.app')
+    ? 'https://hudagymwear.vercel.app'
+    : origin;
+  const base = (configured?.trim() || productionFallback).replace(/\/+$/, '');
   return `${base}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
