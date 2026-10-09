@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from '@tanstack/react-router';
-import { LayoutDashboard, Package, ShoppingBag, Users, BarChart3, Settings, ArrowUpRight, ArrowLeft, Search, Bell, Plus, Pencil, Trash2, Menu, LogOut, Check, Boxes, Tags, BadgePercent, Lock, ImagePlus, X, Copy, Star, Mail, Eye, EyeOff } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingBag, BarChart3, Settings, ArrowUpRight, ArrowLeft, Search, Bell, Plus, Pencil, Trash2, Menu, LogOut, Check, Boxes, Tags, BadgePercent, Lock, ImagePlus, X, Copy, Star, Mail, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { products, money, upsertProduct, deleteProduct, totalStock, sizeStock, slugify, tones, badges, sizes, productImage, productColours, getProduct, COLOUR_PRESETS, guessTone, presetFor, effectivePrice, useProducts, type Product, type ProductColour, type ProductStatus } from '@/lib/catalog';
@@ -13,7 +13,7 @@ import { listDiscounts, saveDiscount, deleteDiscount, useDiscounts, type Discoun
 import { listCategories, saveCategories, useCategories } from '@/lib/merch';
 import { uploadProductImage, fileToWebPDataUrl, deleteProductImage, isStorageReady, TRANSFER_BUCKET } from '@/lib/product-images';
 import { getSupabase } from '@/lib/supabase';
-import { listUsers, deleteAccount, addCustomerNote, setCustomerTags, login, logout, isAdminUser, isDemoMode, onAuthChange, type User } from '@/lib/account';
+import { login, logout, isAdminUser, isDemoMode, onAuthChange } from '@/lib/account';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { getSettings, updateSettings, useSettings, DEFAULT_SHIPPING } from '@/lib/shop-settings';
 import { subscribeToStoreEvent } from '@/lib/realtime';
@@ -146,7 +146,6 @@ const nav = [
   { label: 'Categories', to: '/admin/categories', icon: Tags },
   { label: 'Discounts', to: '/admin/discounts', icon: BadgePercent },
   { label: 'Reviews', to: '/admin/reviews', icon: Star },
-  { label: 'Customers', to: '/admin/customers', icon: Users },
   { label: 'Messages', to: '/admin/messages', icon: Mail },
   { label: 'Analytics', to: '/admin/analytics', icon: BarChart3 },
   { label: 'Settings', to: '/admin/settings', icon: Settings },
@@ -186,7 +185,7 @@ export function AdminLayout({ children, title }: { children: ReactNode; title: s
   const out = liveProducts.filter(p => totalStock(p) <= 0).length;
   const totalAlerts = low + out + unreadMsgCount + pendingOrderCount + pendingReviewCount;
 
-  return <div className="admin-layout"><aside className={`admin-sidebar ${menu ? 'open' : ''}`}><Link to="/" className="admin-brand"><img src={logo.url} alt="HUDA GYMWEAR" /><span>BRAND STUDIO<small>Store management</small></span></Link><span className="admin-nav-label">MANAGE</span><nav>{nav.slice(0, 9).map(n => <Link to={n.to} key={n.label} activeProps={{ className: 'active' }} activeOptions={{ exact: n.to === '/admin' }} onClick={() => setMenu(false)}><n.icon size={17} />{n.label}{n.to === '/admin/orders' && pendingOrderCount > 0 ? <span className="nav-badge">{pendingOrderCount}</span> : n.to === '/admin/reviews' && pendingReviewCount > 0 ? <span className="nav-badge">{pendingReviewCount}</span> : n.to === '/admin/messages' && unreadMsgCount > 0 ? <span className="nav-badge">{unreadMsgCount}</span> : null}</Link>)}</nav><span className="admin-nav-label">INSIGHTS & SETUP</span><nav>{nav.slice(9).map(n => <Link to={n.to} key={n.label} activeProps={{ className: 'active' }} activeOptions={{ exact: true }} onClick={() => setMenu(false)}><n.icon size={17} />{n.label}</Link>)}</nav><button className="admin-store-link as-button" onClick={() => { adminLogout(); void logout(); navigate({ to: '/admin/login' }); }}>Sign out <LogOut size={16} /></button><Link className="admin-store-link" to="/">View storefront <ArrowUpRight size={16} /></Link></aside><div className="admin-main"><header className="admin-topbar"><Button variant="tool" className="admin-menu" aria-label="Toggle admin menu" aria-expanded={menu} onClick={() => setMenu(!menu)}><Menu /></Button><div className="admin-breadcrumb">Brand Studio <span>/</span> {title}</div><div className="admin-top-tools"><Button variant="tool" aria-label="Notifications" aria-expanded={notifications} aria-haspopup="dialog" onClick={() => setNotifications(!notifications)}><Bell />{totalAlerts > 0 && <span className="counter">{totalAlerts}</span>}</Button><span className="admin-avatar">HG</span></div>{notifications && <div className="notification-panel" role="dialog" aria-label="Notifications"><h3>Notifications</h3>{pendingOrderCount > 0 && <p>{pendingOrderCount} order{pendingOrderCount > 1 ? 's' : ''} awaiting fulfillment</p>}{pendingReviewCount > 0 && <p>{pendingReviewCount} review{pendingReviewCount > 1 ? 's' : ''} awaiting moderation</p>}{unreadMsgCount > 0 && <p>{unreadMsgCount} unread message{unreadMsgCount > 1 ? 's' : ''}</p>}{out > 0 && <p>{out} product{out > 1 ? 's' : ''} out of stock</p>}{low > 0 && <p>{low} product{low > 1 ? 's' : ''} running low</p>}{totalAlerts === 0 && <p>All stocked up. Looking good.</p>}<Button variant="link" size="sm" onClick={() => { setNotifications(false); navigate({ to: '/admin/inventory' }); }}>View inventory</Button></div>}</header>{menu && <div className="sidebar-scrim" onClick={() => setMenu(false)} aria-hidden="true" />}<main className="admin-content">{children}</main></div></div>;
+  return <div className="admin-layout"><aside className={`admin-sidebar ${menu ? 'open' : ''}`}><Link to="/" className="admin-brand"><img src={logo.url} alt="HUDA GYMWEAR" /><span>BRAND STUDIO<small>Store management</small></span></Link><span className="admin-nav-label">MANAGE</span><nav>{nav.slice(0, 8).map(n => <Link to={n.to} key={n.label} activeProps={{ className: 'active' }} activeOptions={{ exact: n.to === '/admin' }} onClick={() => setMenu(false)}><n.icon size={17} />{n.label}{n.to === '/admin/orders' && pendingOrderCount > 0 ? <span className="nav-badge">{pendingOrderCount}</span> : n.to === '/admin/reviews' && pendingReviewCount > 0 ? <span className="nav-badge">{pendingReviewCount}</span> : n.to === '/admin/messages' && unreadMsgCount > 0 ? <span className="nav-badge">{unreadMsgCount}</span> : null}</Link>)}</nav><span className="admin-nav-label">INSIGHTS & SETUP</span><nav>{nav.slice(8).map(n => <Link to={n.to} key={n.label} activeProps={{ className: 'active' }} activeOptions={{ exact: true }} onClick={() => setMenu(false)}><n.icon size={17} />{n.label}</Link>)}</nav><button className="admin-store-link as-button" onClick={() => { adminLogout(); void logout(); navigate({ to: '/admin/login' }); }}>Sign out <LogOut size={16} /></button><Link className="admin-store-link" to="/">View storefront <ArrowUpRight size={16} /></Link></aside><div className="admin-main"><header className="admin-topbar"><Button variant="tool" className="admin-menu" aria-label="Toggle admin menu" aria-expanded={menu} onClick={() => setMenu(!menu)}><Menu /></Button><div className="admin-breadcrumb">Brand Studio <span>/</span> {title}</div><div className="admin-top-tools"><Button variant="tool" aria-label="Notifications" aria-expanded={notifications} aria-haspopup="dialog" onClick={() => setNotifications(!notifications)}><Bell />{totalAlerts > 0 && <span className="counter">{totalAlerts}</span>}</Button><span className="admin-avatar">HG</span></div>{notifications && <div className="notification-panel" role="dialog" aria-label="Notifications"><h3>Notifications</h3>{pendingOrderCount > 0 && <p>{pendingOrderCount} order{pendingOrderCount > 1 ? 's' : ''} awaiting fulfillment</p>}{pendingReviewCount > 0 && <p>{pendingReviewCount} review{pendingReviewCount > 1 ? 's' : ''} awaiting moderation</p>}{unreadMsgCount > 0 && <p>{unreadMsgCount} unread message{unreadMsgCount > 1 ? 's' : ''}</p>}{out > 0 && <p>{out} product{out > 1 ? 's' : ''} out of stock</p>}{low > 0 && <p>{low} product{low > 1 ? 's' : ''} running low</p>}{totalAlerts === 0 && <p>All stocked up. Looking good.</p>}<Button variant="link" size="sm" onClick={() => { setNotifications(false); navigate({ to: '/admin/inventory' }); }}>View inventory</Button></div>}</header>{menu && <div className="sidebar-scrim" onClick={() => setMenu(false)} aria-hidden="true" />}<main className="admin-content">{children}</main></div></div>;
 }
 function PageHead({ eyebrow, h1, sub, children }: { eyebrow?: string; h1: string; sub?: string; children?: ReactNode }) {
   return <div className="admin-page-title"><div>{eyebrow && <span className="eyebrow">{eyebrow}</span>}<h1>{h1}</h1>{sub && <p>{sub}</p>}</div><div className="admin-actions">{children}</div></div>;
@@ -522,34 +521,6 @@ export function DiscountEditor({ initial, onSaved }: { initial: Discount | undef
     <div className="editor-foot"><Button variant="fashion" type="submit">SAVE CODE</Button></div></form>;
 }
 
-// --- customers ------------------------------------------------------------------------
-export function AdminCustomers() {
-  const [tick, setTick] = useState(0);
-  const [users, setUsers] = useState<User[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
-  useEffect(() => {
-    listUsers().then(setUsers);
-    listOrders().then(setOrders);
-    const offOrders = subscribeToStoreEvent('orders:changed', () => setTick(t => t + 1));
-    const offProfiles = subscribeToStoreEvent('profiles:changed', () => setTick(t => t + 1));
-    return () => { offOrders(); offProfiles(); };
-  }, [tick]);
-  const [q, setQ] = useState('');
-  const [detail, setDetail] = useState<string | null>(null);
-  const rows = users.map(u => {
-    const mine = orders.filter(o => o.email === u.email);
-    return { ...u, orderCount: mine.length, spent: mine.filter(o => o.status !== 'Cancelled').reduce((n, o) => n + o.total, 0), orders: mine };
-  }).filter(u => !q || (u.name + u.email).toLowerCase().includes(q.toLowerCase()));
-  const current = rows.find(u => u.email === detail);
-  return <AdminLayout title="Customers"><PageHead h1="Customers" sub={`${users.length} registered account${users.length === 1 ? '' : 's'} — live from sign-ups.`}><Button variant="quiet" onClick={() => downloadCSV('huda-customers', rows.map((u) => ({ name: u.name, email: u.email, joined: u.createdAt.slice(0, 10), orders: u.orderCount, spent: u.spent, tags: (u.tags ?? []).join('; ') })))}>EXPORT CSV</Button></PageHead>
-    <section className="admin-panel"><div className="admin-filter"><label><Search size={16} /><input aria-label="Search customers" placeholder="Search customers…" value={q} onChange={e => setQ(e.target.value)} /></label></div>
-      {rows.length === 0 ? <p className="fine-print">No customer accounts yet. New sign-ups appear here automatically.</p> : <div className="table-scroll"><table className="admin-table"><thead><tr><th scope="col">Customer</th><th scope="col">Joined</th><th scope="col">Orders</th><th scope="col">Total spent</th><th scope="col" /></tr></thead><tbody>{rows.map(u => <tr key={u.email}><td>{u.name}<small className="table-small">{u.email}</small>{(u.tags ?? []).length > 0 && <small className="table-tags">{(u.tags ?? []).join(' · ')}</small>}</td><td>{new Date(u.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</td><td>{u.orderCount}</td><td>{money(u.spent)}</td><td><Button variant="tool" aria-label={`View ${u.name}`} onClick={() => setDetail(u.email)}><ArrowUpRight size={15} /></Button></td></tr>)}</tbody></table></div>}</section>
-    <Dialog open={!!detail} onOpenChange={() => setDetail(null)}><DialogContent>{current && <><DialogTitle>{current.name}</DialogTitle><DialogDescription>{current.email} · customer since {new Date(current.createdAt).toLocaleDateString('en-GB')}</DialogDescription>
-      <p><strong>{current.orderCount} orders · {money(current.spent)} lifetime</strong></p>
-      {current.addresses.length > 0 && <p>{current.addresses[0]?.street}, {current.addresses[0]?.city} {current.addresses[0]?.postcode}</p>}
-      {current.orders.length > 0 ? current.orders.map(o => <p key={o.id}>{o.id} · {o.status} · {money(o.total)}</p>) : <p className="fine-print">No orders placed yet.</p>}<CustomerNotes email={current.email} onChanged={() => setTick((t) => t + 1)} /><div className="admin-actions"><Button variant="link" size="sm" onClick={() => { if (window.confirm(`Delete ${current.name}'s account? Their orders stay in store records.`)) { void deleteAccount(current.email).then((ok) => { if (ok) { setDetail(null); setTick((t) => t + 1); toast.success('Customer account deleted.'); } else toast.error('Could not delete this account.'); }); } }}>Delete account (GDPR)</Button></div></>}</DialogContent></Dialog></AdminLayout>;
-}
-
 // --- analytics --------------------------------------------------------------------------
 export function AdminAnalytics() {
   const [all, setAll] = useState<Order[]>([]);
@@ -719,21 +690,9 @@ export function AdminMessages() {
     {shown.length === 0 ? <section className="admin-panel"><p className="fine-print">Inbox zero. New form submissions appear here.</p></section> : shown.map((m) => <section className="admin-panel" key={m.id}><div className="manage-row"><div><strong>{m.name || m.email}</strong><small>{kindLabel(m.kind)} · {m.email} · {new Date(m.createdAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small></div><span className={`status-tag ${m.read ? 'neutral' : 'pending'}`}>{m.read ? 'Read' : 'New'}</span></div>{m.message && <p className="mt-6">{m.message}</p>}<div className="admin-actions"><Button variant="quiet" size="sm" onClick={() => { markMessageRead(m.id, !m.read); refresh(); toast.success(m.read ? 'Marked as unread.' : 'Marked as read.'); }}>Mark as {m.read ? 'unread' : 'read'}</Button><Button variant="tool" aria-label={`Delete ${m.kind} message from ${m.email}`} onClick={() => { if (window.confirm('Delete this message?')) { deleteMessage(m.id); refresh(); toast.success('Message deleted.'); } }}><Trash2 size={15} /></Button></div></section>)}</AdminLayout>;
 }
 
-function CustomerNotes({ email, onChanged }: { email: string; onChanged: () => void }) {
-  const [note, setNote] = useState('');
-  const [tags, setTags] = useState('');
-  const [user, setUser] = useState<User | null>(null);
-  const [rt, setRt] = useState(0);
-  useEffect(() => { listUsers().then((ls) => setUser(ls.find((u) => u.email === email) ?? null)); }, [email, rt]);
-  if (!user) return null;
-  const bump = () => { setRt((t) => t + 1); onChanged(); };
-  return <div className="customer-notes"><div className="form-grid"><label className="form-field full">Tags (comma separated)<input value={tags} onChange={(e) => setTags(e.target.value)} placeholder={(user.tags ?? []).join(', ') || 'VIP, wholesale…'} /></label></div><div className="admin-actions"><Button variant="quiet" size="sm" onClick={() => { if (!tags.trim()) { if ((user.tags ?? []).length && !window.confirm('Remove all tags from this customer?')) return; } void setCustomerTags(email, tags.split(',')).then(() => { setTags(''); bump(); toast.success('Tags saved.'); }); }}>SAVE TAGS</Button></div>{(user.tags ?? []).length > 0 && <p className="fine-print">Tags: {(user.tags ?? []).join(' · ')}</p>}{(user.notes ?? []).length > 0 ? [...(user.notes ?? [])].reverse().map((n, i) => <p key={i} className="note-line">{n.text}<small className="table-small"> · {new Date(n.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</small></p>) : <p className="fine-print">No notes yet.</p>}<form className="url-row" onSubmit={(e) => { e.preventDefault(); if (!note.trim()) return; const dup = (user.notes ?? []).some((n) => n.text === note.trim() && Date.now() - new Date(n.at).getTime() < 10000); if (dup) { toast.info('This note was just added.'); return; } void addCustomerNote(email, note).then(() => { setNote(''); bump(); toast.success('Note added.'); }); }}><input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add an internal note…" aria-label="Customer note" /><Button variant="quiet" type="submit" size="sm" disabled={!note.trim()}>ADD NOTE</Button></form></div>;
-}
-
 // --- draft orders (WhatsApp / phone orders booked by staff) ---------------------
 export function AdminOrderDraft() {
   const navigate = useNavigate();
-  const [customerEmail, setCustomerEmail] = useState('');
   const [guestName, setGuestName] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
   const [q, setQ] = useState('');
@@ -743,8 +702,6 @@ export function AdminOrderDraft() {
   const [error, setError] = useState('');
   const [placing, setPlacing] = useState(false);
   const draftKey = useRef(`draft-${Date.now().toString(36)}`);
-  const [users, setUsers] = useState<User[]>([]);
-  useEffect(() => { listUsers().then(setUsers); }, []);
   const settings = useSettings();
   const products = useProducts();
   const results = q.trim() ? products.filter((p) => (p.name + ' ' + p.colour).toLowerCase().includes(q.trim().toLowerCase())).slice(0, 6) : [];
@@ -771,8 +728,8 @@ export function AdminOrderDraft() {
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (placing) return;
-    const email = (customerEmail || guestEmail).trim().toLowerCase();
-    const customer = customerEmail ? users.find((u) => u.email === customerEmail)?.name ?? email : guestName.trim();
+    const email = guestEmail.trim().toLowerCase();
+    const customer = guestName.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { setError('Enter a valid customer email.'); return; }
     if (!customer) { setError('Enter the customer name.'); return; }
     if (!detailed.length) { setError('Add at least one item.'); return; }
@@ -807,7 +764,7 @@ export function AdminOrderDraft() {
   }
   return <AdminLayout title="New draft order"><PageHead h1="New draft order" sub="Book a WhatsApp or phone order into the same pipeline." />
     <form onSubmit={submit}><div className="admin-chart-layout">
-      <section className="admin-panel"><h2>Customer</h2><div className="form-grid"><label className="form-field full">Registered customer<select value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)}><option value="">Walk-in / guest…</option>{users.map((u) => <option key={u.email} value={u.email}>{u.name} — {u.email}</option>)}</select></label>{!customerEmail && <><label className="form-field">Name<input value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="Customer name" /></label><label className="form-field">Email<input type="email" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} placeholder="you@example.co.uk" /></label></>}</div></section>
+      <section className="admin-panel"><h2>Customer</h2><div className="form-grid"><label className="form-field">Name<input value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="Customer name" /></label><label className="form-field">Email<input type="email" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} placeholder="you@example.co.uk" /></label></div></section>
       <section className="admin-panel"><h2>Delivery address</h2><div className="form-grid"><label className="form-field">First name<input value={addr.firstName} onChange={(e) => setAddr({ ...addr, firstName: e.target.value })} /></label><label className="form-field">Last name<input value={addr.lastName} onChange={(e) => setAddr({ ...addr, lastName: e.target.value })} /></label><label className="form-field full">Street<input value={addr.street} onChange={(e) => setAddr({ ...addr, street: e.target.value })} /></label><label className="form-field">Town / city<input value={addr.city} onChange={(e) => setAddr({ ...addr, city: e.target.value })} /></label><label className="form-field">Postcode<input value={addr.postcode} onChange={(e) => setAddr({ ...addr, postcode: e.target.value })} /></label><label className="form-field">Phone<input value={addr.phone} onChange={(e) => setAddr({ ...addr, phone: e.target.value })} /></label></div></section>
     </div><div className="admin-chart-layout">
       <section className="admin-panel"><h2>Items</h2><label className="form-field">Add product<input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or colour…" /></label>{results.length > 0 && <div className="pick-grid">{results.map((p) => <button key={p.id} type="button" className="pick-card" aria-label={`Add ${p.name} to draft order`} onClick={() => addLine(p.id)}><img src={p.image} alt="" /><span>{p.name}</span><span>{money(effectivePrice(p))}</span></button>)}</div>}{detailed.length === 0 ? <p className="fine-print">No items yet.</p> : detailed.map(({ line, p }) => <div key={line.id + line.size} className="manage-row"><div><strong>{p!.name}</strong><small>{p!.colour} · {money(effectivePrice(p!))} each</small></div><div className="admin-actions"><select value={line.size} aria-label={`Size for ${p!.name}`} onChange={(e) => { const ns = e.target.value; setLines((ls) => ls.map((l) => l === line ? { ...l, size: ns, qty: Math.min(l.qty, Math.max(1, sizeStock(p!, ns))) } : l)); }}>{sizes.filter((s) => s === line.size || sizeStock(p!, s) > 0).map((s) => <option key={s} value={s}>{s}{sizeStock(p!, s) <= 0 ? ' (0 left)' : ''}</option>)}</select><Button variant="tool" type="button" aria-label={`Decrease quantity of ${p!.name} ${line.size}`} disabled={line.qty <= 1} onClick={() => setLines((ls) => ls.map((l) => (l === line ? { ...l, qty: Math.max(1, l.qty - 1) } : l)))}>−</Button><span>{line.qty}</span><Button variant="tool" type="button" aria-label={`Increase quantity of ${p!.name} ${line.size}`} disabled={line.qty >= sizeStock(p!, line.size)} onClick={() => setLines((ls) => ls.map((l) => { if (l !== line) return l; if (l.qty + 1 > sizeStock(p!, l.size)) { toast.error('No more stock in this size.'); return l; } return { ...l, qty: l.qty + 1 }; }))}>+</Button><Button variant="tool" type="button" aria-label={`Remove ${p!.name} ${line.size} from draft`} onClick={() => setLines((ls) => ls.filter((l) => l !== line))}><Trash2 size={14} /></Button></div></div>)}

@@ -2,7 +2,7 @@ import { Link } from '@tanstack/react-router';
 
 export type Crumb = {
   label: string;
-  to?: '/' | '/shop' | '/account' | '/orders';
+  to?: '/' | '/shop' | '/orders';
   shopSearch?: { category?: string; q?: string };
 };
 

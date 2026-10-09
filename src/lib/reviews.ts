@@ -1,5 +1,4 @@
 import { getSupabase } from './supabase';
-import { ordersByEmail } from './orders';
 import { broadcastStoreEvent } from './realtime';
 
 export type ReviewStatus = 'pending' | 'approved' | 'rejected';
@@ -80,20 +79,21 @@ export async function averageRating(productId: string): Promise<{ avg: number; c
 }
 export async function hasReviewed(productId: string, email: string): Promise<boolean> {
   const e = email.trim().toLowerCase();
+  if (!e) return false;
   const sb = getSupabase();
   if (!sb) return readAllSync().some((r) => r.productId === productId && r.email === e && r.status !== 'rejected');
-  const { data: { session } } = await sb.auth.getSession();
-  let q = sb.from('reviews').select('id').eq('product_id', productId).neq('status', 'rejected');
-  q = session ? q.or(`user_id.eq.${session.user.id},email.eq.${e}`) : q.eq('email', e);
-  const { data } = await q.limit(1);
+  const { data } = await sb.from('reviews').select('id').eq('product_id', productId).eq('email', e).neq('status', 'rejected').limit(1);
   return ((data ?? []) as unknown[]).length > 0;
 }
 export async function addReview(input: Omit<Review, 'id' | 'helpful' | 'status' | 'createdAt' | 'userId'> & { userId?: string }): Promise<Review> {
+  // Open submission: userId is accepted for compatibility but always ignored (anon insert => null).
+  const { userId: _ignored, ...rest } = input;
+  void _ignored;
   const sb = getSupabase();
   if (!sb) {
     const review: Review = {
-      ...input,
-      email: input.email.trim().toLowerCase(),
+      ...rest,
+      email: rest.email.trim().toLowerCase(),
       id: `rev-${Date.now().toString(36)}`,
       helpful: 0,
       status: 'pending',
@@ -104,14 +104,14 @@ export async function addReview(input: Omit<Review, 'id' | 'helpful' | 'status' 
   }
   const id = `rev-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   const { data, error } = await sb.from('reviews').insert({
-    id, product_id: input.productId, user_id: input.userId ?? null,
-    author: input.author, email: input.email.trim().toLowerCase(),
-    rating: input.rating, title: input.title, body: input.body, size: input.size,
-    verified: input.verified, status: 'pending', helpful: 0, seed: false,
+    id, product_id: rest.productId, user_id: null,
+    author: rest.author, email: rest.email.trim().toLowerCase(),
+    rating: rest.rating, title: rest.title, body: rest.body, size: rest.size,
+    verified: rest.verified, status: 'pending', helpful: 0, seed: false,
   }).select('*').single();
   if (error || !data) throw new Error(error?.message || 'Could not submit your review.');
   const rev = toReview(data as ReviewRow);
-  broadcastStoreEvent('reviews:changed', { action: 'add', id: rev.id, productId: input.productId });
+  broadcastStoreEvent('reviews:changed', { action: 'add', id: rev.id, productId: rest.productId });
   return rev;
 }
 export async function setReviewStatus(id: string, status: ReviewStatus): Promise<void> {
@@ -176,13 +176,10 @@ export async function markHelpful(id: string): Promise<boolean> {
   return true;
 }
 
-// Can this account review this product? Verified = account + delivered order with it.
+// Open submission: no account required. Eligibility is only a duplicate check by email.
 export async function reviewEligibility(productId: string, email: string | null): Promise<{ ok: boolean; reason: string }> {
-  if (!email) return { ok: false, reason: 'Sign in to write a review.' };
-  if (await hasReviewed(productId, email)) return { ok: false, reason: 'You have already reviewed this piece — thank you!' };
-  const bought = (await ordersByEmail(email)).some(
-    (o) => o.status === 'Delivered' && o.items.some((it) => it.productId === productId),
-  );
-  if (!bought) return { ok: false, reason: 'Only verified buyers can review — purchase this piece first and it will unlock after delivery.' };
+  const e = (email ?? '').trim().toLowerCase();
+  if (!e || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return { ok: true, reason: '' };
+  if (await hasReviewed(productId, e)) return { ok: false, reason: 'You have already reviewed this piece — thank you!' };
   return { ok: true, reason: '' };
 }

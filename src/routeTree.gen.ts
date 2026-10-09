@@ -12,7 +12,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as AccessoriesRouteImport } from './routes/accessories'
-import { Route as AccountRouteImport } from './routes/account'
 import { Route as BestSellersRouteImport } from './routes/best-sellers'
 import { Route as BottomsRouteImport } from './routes/bottoms'
 import { Route as CartRouteImport } from './routes/cart'
@@ -38,11 +37,9 @@ import { Route as SportsBrasRouteImport } from './routes/sports-bras'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as TopsRouteImport } from './routes/tops'
 import { Route as WishlistRouteImport } from './routes/wishlist'
-import { Route as AccountResetRouteImport } from './routes/account.reset'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminAnalyticsRouteImport } from './routes/admin/analytics'
 import { Route as AdminCategoriesRouteImport } from './routes/admin/categories'
-import { Route as AdminCustomersRouteImport } from './routes/admin/customers'
 import { Route as AdminDiscountsRouteImport } from './routes/admin/discounts'
 import { Route as AdminInventoryRouteImport } from './routes/admin/inventory'
 import { Route as AdminLoginRouteImport } from './routes/admin/login'
@@ -68,11 +65,6 @@ const AboutRoute = AboutRouteImport.update({
 const AccessoriesRoute = AccessoriesRouteImport.update({
   id: '/accessories',
   path: '/accessories',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AccountRoute = AccountRouteImport.update({
-  id: '/account',
-  path: '/account',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BestSellersRoute = BestSellersRouteImport.update({
@@ -200,11 +192,6 @@ const WishlistRoute = WishlistRouteImport.update({
   path: '/wishlist',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AccountResetRoute = AccountResetRouteImport.update({
-  id: '/reset',
-  path: '/reset',
-  getParentRoute: () => AccountRoute,
-} as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/admin/',
   path: '/admin/',
@@ -218,11 +205,6 @@ const AdminAnalyticsRoute = AdminAnalyticsRouteImport.update({
 const AdminCategoriesRoute = AdminCategoriesRouteImport.update({
   id: '/admin/categories',
   path: '/admin/categories',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminCustomersRoute = AdminCustomersRouteImport.update({
-  id: '/admin/customers',
-  path: '/admin/customers',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminDiscountsRoute = AdminDiscountsRouteImport.update({
@@ -285,7 +267,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/accessories': typeof AccessoriesRoute
-  '/account': typeof AccountRouteWithChildren
   '/best-sellers': typeof BestSellersRoute
   '/bottoms': typeof BottomsRoute
   '/cart': typeof CartRoute
@@ -311,10 +292,8 @@ export interface FileRoutesByFullPath {
   '/terms': typeof TermsRoute
   '/tops': typeof TopsRoute
   '/wishlist': typeof WishlistRoute
-  '/account/reset': typeof AccountResetRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/categories': typeof AdminCategoriesRoute
-  '/admin/customers': typeof AdminCustomersRoute
   '/admin/discounts': typeof AdminDiscountsRoute
   '/admin/inventory': typeof AdminInventoryRoute
   '/admin/login': typeof AdminLoginRoute
@@ -332,7 +311,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/accessories': typeof AccessoriesRoute
-  '/account': typeof AccountRouteWithChildren
   '/best-sellers': typeof BestSellersRoute
   '/bottoms': typeof BottomsRoute
   '/cart': typeof CartRoute
@@ -358,10 +336,8 @@ export interface FileRoutesByTo {
   '/terms': typeof TermsRoute
   '/tops': typeof TopsRoute
   '/wishlist': typeof WishlistRoute
-  '/account/reset': typeof AccountResetRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/categories': typeof AdminCategoriesRoute
-  '/admin/customers': typeof AdminCustomersRoute
   '/admin/discounts': typeof AdminDiscountsRoute
   '/admin/inventory': typeof AdminInventoryRoute
   '/admin/login': typeof AdminLoginRoute
@@ -380,7 +356,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/accessories': typeof AccessoriesRoute
-  '/account': typeof AccountRouteWithChildren
   '/best-sellers': typeof BestSellersRoute
   '/bottoms': typeof BottomsRoute
   '/cart': typeof CartRoute
@@ -406,10 +381,8 @@ export interface FileRoutesById {
   '/terms': typeof TermsRoute
   '/tops': typeof TopsRoute
   '/wishlist': typeof WishlistRoute
-  '/account/reset': typeof AccountResetRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/categories': typeof AdminCategoriesRoute
-  '/admin/customers': typeof AdminCustomersRoute
   '/admin/discounts': typeof AdminDiscountsRoute
   '/admin/inventory': typeof AdminInventoryRoute
   '/admin/login': typeof AdminLoginRoute
@@ -429,7 +402,6 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/accessories'
-    | '/account'
     | '/best-sellers'
     | '/bottoms'
     | '/cart'
@@ -455,10 +427,8 @@ export interface FileRouteTypes {
     | '/terms'
     | '/tops'
     | '/wishlist'
-    | '/account/reset'
     | '/admin/analytics'
     | '/admin/categories'
-    | '/admin/customers'
     | '/admin/discounts'
     | '/admin/inventory'
     | '/admin/login'
@@ -476,7 +446,6 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/accessories'
-    | '/account'
     | '/best-sellers'
     | '/bottoms'
     | '/cart'
@@ -502,10 +471,8 @@ export interface FileRouteTypes {
     | '/terms'
     | '/tops'
     | '/wishlist'
-    | '/account/reset'
     | '/admin/analytics'
     | '/admin/categories'
-    | '/admin/customers'
     | '/admin/discounts'
     | '/admin/inventory'
     | '/admin/login'
@@ -523,7 +490,6 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/accessories'
-    | '/account'
     | '/best-sellers'
     | '/bottoms'
     | '/cart'
@@ -549,10 +515,8 @@ export interface FileRouteTypes {
     | '/terms'
     | '/tops'
     | '/wishlist'
-    | '/account/reset'
     | '/admin/analytics'
     | '/admin/categories'
-    | '/admin/customers'
     | '/admin/discounts'
     | '/admin/inventory'
     | '/admin/login'
@@ -571,7 +535,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
   AccessoriesRoute: typeof AccessoriesRoute
-  AccountRoute: typeof AccountRouteWithChildren
   BestSellersRoute: typeof BestSellersRoute
   BottomsRoute: typeof BottomsRoute
   CartRoute: typeof CartRoute
@@ -599,7 +562,6 @@ export interface RootRouteChildren {
   WishlistRoute: typeof WishlistRoute
   AdminAnalyticsRoute: typeof AdminAnalyticsRoute
   AdminCategoriesRoute: typeof AdminCategoriesRoute
-  AdminCustomersRoute: typeof AdminCustomersRoute
   AdminDiscountsRoute: typeof AdminDiscountsRoute
   AdminInventoryRoute: typeof AdminInventoryRoute
   AdminLoginRoute: typeof AdminLoginRoute
@@ -634,13 +596,6 @@ declare module '@tanstack/react-router' {
       path: '/accessories'
       fullPath: '/accessories'
       preLoaderRoute: typeof AccessoriesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/account': {
-      id: '/account'
-      path: '/account'
-      fullPath: '/account'
-      preLoaderRoute: typeof AccountRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/best-sellers': {
@@ -818,13 +773,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WishlistRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/account/reset': {
-      id: '/account/reset'
-      path: '/reset'
-      fullPath: '/account/reset'
-      preLoaderRoute: typeof AccountResetRouteImport
-      parentRoute: typeof AccountRoute
-    }
     '/admin/': {
       id: '/admin/'
       path: '/admin'
@@ -844,13 +792,6 @@ declare module '@tanstack/react-router' {
       path: '/admin/categories'
       fullPath: '/admin/categories'
       preLoaderRoute: typeof AdminCategoriesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin/customers': {
-      id: '/admin/customers'
-      path: '/admin/customers'
-      fullPath: '/admin/customers'
-      preLoaderRoute: typeof AdminCustomersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/discounts': {
@@ -933,17 +874,6 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface AccountRouteChildren {
-  AccountResetRoute: typeof AccountResetRoute
-}
-
-const AccountRouteChildren: AccountRouteChildren = {
-  AccountResetRoute: AccountResetRoute,
-}
-
-const AccountRouteWithChildren =
-  AccountRoute._addFileChildren(AccountRouteChildren)
-
 interface AdminOrdersRouteChildren {
   AdminOrdersNewRoute: typeof AdminOrdersNewRoute
 }
@@ -960,7 +890,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
   AccessoriesRoute: AccessoriesRoute,
-  AccountRoute: AccountRouteWithChildren,
   BestSellersRoute: BestSellersRoute,
   BottomsRoute: BottomsRoute,
   CartRoute: CartRoute,
@@ -988,7 +917,6 @@ const rootRouteChildren: RootRouteChildren = {
   WishlistRoute: WishlistRoute,
   AdminAnalyticsRoute: AdminAnalyticsRoute,
   AdminCategoriesRoute: AdminCategoriesRoute,
-  AdminCustomersRoute: AdminCustomersRoute,
   AdminDiscountsRoute: AdminDiscountsRoute,
   AdminInventoryRoute: AdminInventoryRoute,
   AdminLoginRoute: AdminLoginRoute,

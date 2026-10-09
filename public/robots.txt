@@ -3,14 +3,12 @@ Allow: /
 Disallow: /admin/
 Disallow: /checkout
 Disallow: /order-success
-Disallow: /account/reset
 
 User-agent: Bingbot
 Allow: /
 Disallow: /admin/
 Disallow: /checkout
 Disallow: /order-success
-Disallow: /account/reset
 
 User-agent: Twitterbot
 Allow: /
@@ -23,7 +21,6 @@ Allow: /
 Disallow: /admin/
 Disallow: /checkout
 Disallow: /order-success
-Disallow: /account/reset
 
 # Production sitemap — regenerate after domain changes:
 #   SITE_URL=https://YOUR-DOMAIN npm run sitemap
