@@ -1,6 +1,5 @@
-// Orders shared by the customer account and the admin dashboard.
-// One pipeline, two views: the customer sees a timeline, the admin moves it.
 import { getSupabase } from './supabase';
+import { broadcastStoreEvent } from './realtime';
 
 export type PaymentMethod = 'cod' | 'bank';
 export type PaymentStatus = 'Cash on delivery' | 'Pending proof' | 'Paid';
@@ -274,7 +273,9 @@ export async function createOrder(input: Omit<Order, 'id' | 'status' | 'timeline
   };
   const { data, error } = await sb.from('orders').insert(row).select('*').single();
   if (error || !data) throw new Error(error?.message || 'Could not place your order. Please try again.');
-  return toOrder(data as OrderRow);
+  const placed = toOrder(data as OrderRow);
+  broadcastStoreEvent('orders:changed', { action: 'create', id: placed.id });
+  return placed;
 }
 async function patchRemote(id: string, fn: (o: Order) => Order): Promise<Order | undefined> {
   const sb = getSupabase()!;
@@ -287,11 +288,13 @@ async function patchRemote(id: string, fn: (o: Order) => Order): Promise<Order |
     timeline: next.timeline,
   }).eq('id', id);
   if (error) return undefined;
+  broadcastStoreEvent('orders:changed', { action: 'update', id });
   return next;
 }
 function patch(id: string, fn: (o: Order) => Order): Order | undefined {
   let out: Order | undefined;
   writeAll(readAll().map((o) => (o.id === id ? (out = fn(o)) : o)));
+  broadcastStoreEvent('orders:changed', { action: 'update', id });
   return out;
 }
 export async function setOrderStatus(id: string, status: OrderStatus): Promise<Order | undefined> {

@@ -1,17 +1,14 @@
+import { useSyncExternalStore, useMemo } from 'react';
 import black from '@/assets/black-set.jpg';
 import taupe from '@/assets/taupe-set.jpg';
 import grey from '@/assets/grey-set.jpg';
 import burgundy from '@/assets/burgundy-hoodie.jpg';
-import { getSupabase } from '@/lib/supabase';
+import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
+import { broadcastStoreEvent, subscribeToStoreEvent } from './realtime';
 
 // ---------------------------------------------------------------------------
 // Catalogue model (Supabase-ready)
 // ---------------------------------------------------------------------------
-// Each product carries its colours, and every colour is linked to its own
-// images (max 6 images per product). `image` / `colour` / `tone` stay as the
-// primary (default) variant so every existing storefront component keeps
-// working unchanged. When the backend moves to Supabase, `images` simply
-// become public storage URLs — no component changes needed.
 export type ProductColour = { name: string; tone: string; images: string[]; hex?: string };
 export type StockMap = Partial<Record<string, number>>;
 export type ProductStatus = 'Active' | 'Draft';
@@ -61,8 +58,7 @@ export const toneFamilies = [
   { id: 'pink', label: 'Pink' },
   { id: 'burgundy', label: 'Burgundy & Red' },
 ];
-// One-click admin palette: every colour the store will ever need.
-// `tone` groups shop filters; `hex` paints the real dot on cards.
+
 export type ColourPreset = { name: string; tone: string; hex: string };
 export const COLOUR_PRESETS: ColourPreset[] = [
   { name: 'Onyx Black', tone: 'onyx', hex: '#1c1a18' },
@@ -98,7 +94,6 @@ export const COLOUR_PRESETS: ColourPreset[] = [
 export function presetFor(name: string): ColourPreset | undefined {
   return COLOUR_PRESETS.find((c) => c.name.toLowerCase() === name.trim().toLowerCase());
 }
-// Guess the closest tone family from a free-text colour name.
 export function guessTone(name: string): string {
   const n = name.toLowerCase();
   const hit = COLOUR_PRESETS.find((c) => n.includes(c.name.toLowerCase()) || c.name.toLowerCase().includes(n));
@@ -117,7 +112,6 @@ export function guessTone(name: string): string {
 export const categories = ['Leggings','Sports Bras','Tops','Hoodies','Bottoms','Matching Sets','Accessories'];
 export const badges = ['NEW','BESTSELLER','SALE'];
 
-// Local gallery (admin image picker). Supabase public URLs can be pasted too.
 export const galleryImages = [
   { id: 'black', src: black, label: 'Onyx set' },
   { id: 'taupe', src: taupe, label: 'Taupe set' },
@@ -126,7 +120,6 @@ export const galleryImages = [
 ];
 
 export const money = (n:number) => new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP'}).format(n);
-// Single price truth: every surface (card, bag, cart, checkout, order) uses this.
 export function effectivePrice(p: { price: number; salePrice?: number }): number {
   return p.salePrice ?? p.price;
 }
@@ -146,7 +139,6 @@ export function isSoldOut(p: Product): boolean {
   return (p.status ?? 'Active') !== 'Active' || totalStock(p) <= 0;
 }
 
-// Primary image, or the image linked to a given colour variant.
 export function productImage(p: Product, colourName?: string): string {
   if (colourName && p.colours) {
     const c = p.colours.find((c) => c.name === colourName);
@@ -154,8 +146,6 @@ export function productImage(p: Product, colourName?: string): string {
   }
   return p.images?.[0] ?? p.image;
 }
-// Single source of truth for "which colours does this product come in".
-// Used by product cards, the product page and the admin — never hardcode dots.
 export function productColours(p: Product): ProductColour[] {
   if (p.colours?.length) return p.colours;
   const preset = presetFor(p.colour);
@@ -165,6 +155,8 @@ export function productColours(p: Product): ProductColour[] {
 // --- storage-backed live catalogue ------------------------------------------
 type CatalogueStore = { added: Product[]; overrides: Record<string, Partial<Product>>; removed: string[] };
 const KEY = 'huda.catalog.v1';
+const SYNCED_KEY = 'huda.catalog.synced.v1';
+
 function readStore(): CatalogueStore {
   try {
     const raw = localStorage.getItem(KEY);
@@ -172,21 +164,32 @@ function readStore(): CatalogueStore {
       const s = JSON.parse(raw) as CatalogueStore;
       return { added: s.added ?? [], overrides: s.overrides ?? {}, removed: s.removed ?? [] };
     }
-  } catch { /* corrupted storage → fall back to seeds */ }
+  } catch { /* ignore */ }
   return { added: [], overrides: {}, removed: [] };
 }
+
 function defaultMatrix(from?: number): StockMap {
   const v = from ?? DEFAULT_STOCK;
   return Object.fromEntries(sizes.map((s) => [s, v]));
 }
+
 function buildCatalogue(): Product[] {
   if (typeof localStorage === 'undefined') return seed.map((p) => ({ ...p, ...seedExtra(p.id) }));
+  
+  // 1. Check if we already have an authoritative synced catalog in localStorage
+  try {
+    const syncedRaw = localStorage.getItem(SYNCED_KEY);
+    if (syncedRaw) {
+      const parsed = JSON.parse(syncedRaw) as Product[];
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch { /* ignore */ }
+
   const s = readStore();
   const out = seed
     .filter((p) => !s.removed.includes(p.id))
     .map((p) => {
       const merged = { ...p, ...seedExtra(p.id), ...(s.overrides[p.id] ?? {}) };
-      // Every product gets a real per-size matrix so stock actually decrements.
       if (!merged.stockBySize) merged.stockBySize = defaultMatrix(merged.stock);
       return merged;
     });
@@ -195,16 +198,59 @@ function buildCatalogue(): Product[] {
   }
   return out;
 }
+
 function persist(s: CatalogueStore) {
-  try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* storage full/blocked */ }
+  try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* ignore */ }
 }
 
-// Live array: every storefront component reads from here, so admin edits
-// appear on the site immediately (persisted across refreshes).
+function persistSynced(list: Product[]) {
+  try { localStorage.setItem(SYNCED_KEY, JSON.stringify(list)); } catch { /* ignore */ }
+}
+
+// Live mutable array for instant synchronous access
 export const products: Product[] = buildCatalogue();
 
-// Launch data: real colour variants + descriptions for the seed catalogue.
-// Stored overrides always win — edit freely in the admin afterwards.
+// Reactive listeners
+let productListeners: Set<() => void> = new Set();
+let productVersion = 0;
+
+export function subscribeProducts(listener: () => void): () => void {
+  productListeners.add(listener);
+  return () => {
+    productListeners.delete(listener);
+  };
+}
+
+function notifyProductsChanged() {
+  productVersion++;
+  productListeners.forEach((fn) => {
+    try {
+      fn();
+    } catch {
+      /* ignore */
+    }
+  });
+}
+
+// Hook for React components to get reactive updates
+export function useProducts(): Product[] {
+  return useSyncExternalStore(
+    subscribeProducts,
+    () => products,
+    () => products
+  );
+}
+
+export function useActiveProducts(): Product[] {
+  const all = useProducts();
+  return useMemo(() => all.filter((p) => (p.status ?? 'Active') === 'Active'), [all]);
+}
+
+export function useProduct(id: string): Product | undefined {
+  const all = useProducts();
+  return useMemo(() => all.find((p) => p.id === id), [all, id]);
+}
+
 function seedExtra(id: string): Partial<Product> {
   const C = (name: string, tone: string, hex: string, images: string[]): ProductColour => ({ name, tone, hex, images });
   const map: Record<string, Partial<Product>> = {
@@ -221,14 +267,16 @@ function seedExtra(id: string): Partial<Product> {
   };
   return map[id] ?? {};
 }
+
 export function getProduct(id: string): Product | undefined {
   return products.find((p) => p.id === id);
 }
+
 export function activeProducts(): Product[] {
   return products.filter((p) => (p.status ?? 'Active') === 'Active');
 }
+
 // --- Supabase row <-> Product mappers ----------------------------------------
-// DB table `public.products` (migration 0004): snake_case columns.
 export type ProductRow = {
   id: string;
   name: string;
@@ -249,6 +297,7 @@ export type ProductRow = {
   created_at?: string;
   updated_at?: string;
 };
+
 export function toProduct(r: ProductRow): Product {
   const p: Product = {
     id: r.id,
@@ -270,6 +319,7 @@ export function toProduct(r: ProductRow): Product {
   if (r.stock_by_size != null && typeof r.stock_by_size === 'object') p.stockBySize = { ...(r.stock_by_size as StockMap) };
   return p;
 }
+
 export function toRow(p: Product): ProductRow {
   return {
     id: p.id,
@@ -290,6 +340,7 @@ export function toRow(p: Product): ProductRow {
     crop: p.crop ?? null,
   };
 }
+
 export async function hydrateCatalog(): Promise<void> {
   const sb = getSupabase();
   if (!sb) return;
@@ -297,16 +348,17 @@ export async function hydrateCatalog(): Promise<void> {
     const { data, error } = await sb.from('products').select('*');
     if (error || !data) return;
     const rows = data as unknown as ProductRow[];
-    if (rows.length === 0) {
-      try {
-        await sb.from('products').upsert(products.map((p) => toRow(p)), { onConflict: 'id', ignoreDuplicates: true });
-      } catch { /* RLS may deny non-admins — fail silently */ }
-      return;
-    }
+    
+    // Convert to products
     const mapped = rows.map(toProduct);
+    
+    // Authoritative update
     products.splice(0, products.length, ...mapped);
-  } catch { /* offline / RLS — keep local */ }
+    persistSynced(mapped);
+    notifyProductsChanged();
+  } catch { /* ignore */ }
 }
+
 export async function upsertProduct(p: Product): Promise<void> {
   const i = products.findIndex((x) => x.id === p.id);
   const s = readStore();
@@ -322,26 +374,36 @@ export async function upsertProduct(p: Product): Promise<void> {
   }
   s.removed = s.removed.filter((id) => id !== p.id);
   persist(s);
+  persistSynced(products);
+  notifyProductsChanged();
+  broadcastStoreEvent('products:changed', { action: 'upsert', id: p.id });
+
   const sb = getSupabase();
   if (!sb) return;
   try {
     await sb.from('products').upsert(toRow(p), { onConflict: 'id' });
-  } catch { /* RLS may deny shoppers decrementing stock — server trigger is truth */ }
+  } catch { /* ignore */ }
 }
+
 export async function deleteProduct(id: string): Promise<void> {
   const i = products.findIndex((x) => x.id === id);
   if (i >= 0) products.splice(i, 1);
   const s = readStore();
   s.added = s.added.filter((a) => a.id !== id);
   delete s.overrides[id];
-  if (seed.some((x) => x.id === id) && !s.removed.includes(id)) s.removed.push(id);
+  if (!s.removed.includes(id)) s.removed.push(id);
   persist(s);
+  persistSynced(products);
+  notifyProductsChanged();
+  broadcastStoreEvent('products:changed', { action: 'delete', id });
+
   const sb = getSupabase();
   if (!sb) return;
   try {
     await sb.from('products').delete().eq('id', id);
-  } catch { /* RLS may deny — fail silently */ }
+  } catch { /* ignore */ }
 }
+
 function diff(base: Product, next: Product): Partial<Product> {
   const out: Partial<Product> = {};
   (Object.keys(next) as (keyof Product)[]).forEach((k) => {
@@ -349,6 +411,14 @@ function diff(base: Product, next: Product): Partial<Product> {
   });
   return out;
 }
+
 export function slugify(name: string): string {
   return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 60) || `piece-${Date.now()}`;
+}
+
+// Hook into realtime events automatically
+if (typeof window !== 'undefined') {
+  subscribeToStoreEvent('products:changed', () => {
+    void hydrateCatalog();
+  });
 }

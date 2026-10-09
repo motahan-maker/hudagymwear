@@ -1,7 +1,6 @@
-// Product reviews (Shopify-style: verified buyers, admin moderation).
-// Stored in localStorage now; maps to a future Supabase `reviews` table.
 import { getSupabase } from './supabase';
 import { ordersByEmail } from './orders';
+import { broadcastStoreEvent } from './realtime';
 
 export type ReviewStatus = 'pending' | 'approved' | 'rejected';
 export type Review = {
@@ -111,15 +110,19 @@ export async function addReview(input: Omit<Review, 'id' | 'helpful' | 'status' 
     verified: input.verified, status: 'pending', helpful: 0, seed: false,
   }).select('*').single();
   if (error || !data) throw new Error(error?.message || 'Could not submit your review.');
-  return toReview(data as ReviewRow);
+  const rev = toReview(data as ReviewRow);
+  broadcastStoreEvent('reviews:changed', { action: 'add', id: rev.id, productId: input.productId });
+  return rev;
 }
 export async function setReviewStatus(id: string, status: ReviewStatus): Promise<void> {
   const sb = getSupabase();
   if (!sb) {
     writeAll(readAllSync().map((r) => (r.id === id ? { ...r, status } : r)));
+    broadcastStoreEvent('reviews:changed', { action: 'status', id });
     return;
   }
   await sb.from('reviews').update({ status }).eq('id', id);
+  broadcastStoreEvent('reviews:changed', { action: 'status', id });
 }
 export async function replyReview(id: string, reply: string): Promise<void> {
   const sb = getSupabase();
@@ -133,17 +136,21 @@ export async function replyReview(id: string, reply: string): Promise<void> {
       }
       return { ...r, adminReply: reply.trim() };
     }));
+    broadcastStoreEvent('reviews:changed', { action: 'reply', id });
     return;
   }
   await sb.from('reviews').update({ admin_reply: reply.trim() || null }).eq('id', id);
+  broadcastStoreEvent('reviews:changed', { action: 'reply', id });
 }
 export async function deleteReview(id: string): Promise<void> {
   const sb = getSupabase();
   if (!sb) {
     writeAll(readAllSync().filter((r) => r.id !== id));
+    broadcastStoreEvent('reviews:changed', { action: 'delete', id });
     return;
   }
   await sb.from('reviews').delete().eq('id', id);
+  broadcastStoreEvent('reviews:changed', { action: 'delete', id });
 }
 function readVoted(): string[] {
   try {

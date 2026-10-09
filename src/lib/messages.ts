@@ -4,6 +4,8 @@ export type Message = {
   message: string; read: boolean; createdAt: string;
 };
 import { getSupabase } from './supabase';
+import { broadcastStoreEvent, subscribeToStoreEvent } from './realtime';
+
 type MessageRow = {
   id: string; kind: string; name: string; email: string;
   message: string; read: boolean; created_at: string;
@@ -38,7 +40,7 @@ export function submitMessage(input: { kind: MessageKind; name?: string; email: 
     message: (input.message ?? '').trim(), read: false, createdAt: new Date().toISOString(),
   };
   writeAll([m, ...readAll()]);
-  // Fire-and-forget: anyone may insert per RLS. Never blocks the form.
+  broadcastStoreEvent('messages:changed', { action: 'submit', id: m.id });
   void (async () => {
     try {
       const sb = getSupabase();
@@ -53,6 +55,7 @@ export function submitMessage(input: { kind: MessageKind; name?: string; email: 
 }
 export function markMessageRead(id: string, read: boolean) {
   writeAll(readAll().map((m) => (m.id === id ? { ...m, read } : m)));
+  broadcastStoreEvent('messages:changed', { action: 'read', id, read });
   void (async () => {
     try {
       const sb = getSupabase();
@@ -63,6 +66,7 @@ export function markMessageRead(id: string, read: boolean) {
 }
 export function deleteMessage(id: string) {
   writeAll(readAll().filter((m) => m.id !== id));
+  broadcastStoreEvent('messages:changed', { action: 'delete', id });
   void (async () => {
     try {
       const sb = getSupabase();
@@ -71,8 +75,6 @@ export function deleteMessage(id: string) {
     } catch { /* ignore */ }
   })();
 }
-// UNION-merge: never delete local rows — anon callers can't read the inbox,
-// so a blind overwrite would wipe locally-kept submissions.
 export async function hydrateMessages(): Promise<void> {
   const sb = getSupabase();
   if (!sb) return;
@@ -84,4 +86,10 @@ export async function hydrateMessages(): Promise<void> {
     const ids = new Set(local.map((m) => m.id));
     writeAll([...local, ...remote.filter((m) => !ids.has(m.id))]);
   } catch { /* ignore — demo mode keeps local data */ }
+}
+
+if (typeof window !== 'undefined') {
+  subscribeToStoreEvent('messages:changed', () => {
+    void hydrateMessages();
+  });
 }

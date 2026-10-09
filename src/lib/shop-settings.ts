@@ -1,6 +1,9 @@
 // Operational shop settings (admin-editable). Pure data — never site copy.
-// Stored in localStorage now; maps 1:1 to a future Supabase `shop_settings` row.
+import { useSyncExternalStore } from 'react';
 import { getSupabase } from './supabase';
+import { setCategoriesFromSettings } from './merch';
+import { broadcastStoreEvent, subscribeToStoreEvent } from './realtime';
+
 export type ShippingMethod = { id: string; label: string; hint: string; price: number; enabled: boolean };
 export type ShopSettings = {
   announcement: string;
@@ -37,19 +40,55 @@ const defaults: ShopSettings = {
   lowStockAt: 5,
 };
 
-export function getSettings(): ShopSettings {
+function readSettings(): ShopSettings {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) return { ...defaults, ...(JSON.parse(raw) as Partial<ShopSettings>) };
   } catch { /* ignore */ }
   return { ...defaults };
 }
+
+// In-memory reactive state
+let memorySettings: ShopSettings = readSettings();
+const settingsListeners = new Set<() => void>();
+
+export function subscribeSettings(listener: () => void): () => void {
+  settingsListeners.add(listener);
+  return () => {
+    settingsListeners.delete(listener);
+  };
+}
+
+function notifySettingsChanged() {
+  settingsListeners.forEach((fn) => {
+    try {
+      fn();
+    } catch {
+      /* ignore */
+    }
+  });
+}
+
+export function getSettings(): ShopSettings {
+  return memorySettings;
+}
+
+export function useSettings(): ShopSettings {
+  return useSyncExternalStore(
+    subscribeSettings,
+    getSettings,
+    getSettings
+  );
+}
+
 type ShopSettingsRow = {
   id: number; announcement: string; whatsapp: string; instagram: string;
   facebook: string; tiktok: string; bank_name: string; account_name: string;
   account_number: string; iban: string; shipping: unknown;
   free_over: number | string; low_stock_at: number | string;
+  categories?: unknown;
 };
+
 // Server is truth in Supabase mode: overwrite the local copy with row id=1.
 export async function hydrateSettings(): Promise<void> {
   const sb = getSupabase();
@@ -77,12 +116,24 @@ export async function hydrateSettings(): Promise<void> {
       freeOver: Number(r.free_over ?? defaults.freeOver),
       lowStockAt: Number(r.low_stock_at ?? defaults.lowStockAt),
     };
+    memorySettings = mapped;
     try { localStorage.setItem(KEY, JSON.stringify(mapped)); } catch { /* ignore */ }
+    notifySettingsChanged();
+
+    // If categories are stored in the shop_settings row, sync them too
+    if (r.categories) {
+      setCategoriesFromSettings(r.categories);
+    }
   } catch { /* ignore — demo mode keeps local data */ }
 }
+
 export function updateSettings(patch: Partial<ShopSettings>): Promise<ShopSettings> {
   const next = { ...getSettings(), ...patch };
+  memorySettings = next;
   try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* ignore */ }
+  notifySettingsChanged();
+  broadcastStoreEvent('settings:changed', { settings: next });
+
   const sb = getSupabase();
   if (!sb) return Promise.resolve(next);
   return (async () => {
@@ -105,9 +156,17 @@ export function updateSettings(patch: Partial<ShopSettings>): Promise<ShopSettin
     return next;
   })();
 }
+
 // wa.me deep link with a pre-filled order message (no WhatsApp API involved).
 export function whatsappLink(message: string): string | null {
   const number = getSettings().whatsapp.replace(/\D/g, '');
   if (!number) return null;
   return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
+}
+
+// Hook into realtime events automatically
+if (typeof window !== 'undefined') {
+  subscribeToStoreEvent('settings:changed', () => {
+    void hydrateSettings();
+  });
 }

@@ -1,14 +1,16 @@
 // Merchandising: category visibility, mirrored from the live storefront logic
 // (shop tabs, NEW IN / BEST SELLERS badges, lookbook edits).
 // Categories are the single source of truth — one category per product.
+import { useSyncExternalStore, useMemo } from 'react';
 import { categories as siteCategories, type Product } from './catalog';
+import { getSupabase } from './supabase';
+import { broadcastStoreEvent, subscribeToStoreEvent } from './realtime';
 
 export type CategorySetting = { name: string; visible: boolean; order: number };
 
 const CAT_KEY = 'huda.categories.v1';
-// Retired collections store (pre-categories era) — cleared once so old browsers
-// don't carry dead merchandising data.
 const LEGACY_COL_KEY = 'huda.collections.v1';
+
 export function clearLegacyCollections(): void {
   try { localStorage.removeItem(LEGACY_COL_KEY); } catch { /* ignore */ }
 }
@@ -16,6 +18,7 @@ export function clearLegacyCollections(): void {
 function seedCategories(): CategorySetting[] {
   return siteCategories.map((name, order) => ({ name, visible: true, order }));
 }
+
 function readCategories(): CategorySetting[] {
   try {
     const raw = localStorage.getItem(CAT_KEY);
@@ -33,20 +36,101 @@ function readCategories(): CategorySetting[] {
   try { localStorage.setItem(CAT_KEY, JSON.stringify(seeds)); } catch { /* ignore */ }
   return seeds;
 }
+
 function writeCategories(list: CategorySetting[]) {
   try { localStorage.setItem(CAT_KEY, JSON.stringify(list)); } catch { /* ignore */ }
 }
+
+// In-memory reactive state
+let memoryCategories: CategorySetting[] = readCategories().sort((a, b) => a.order - b.order);
+const categoryListeners = new Set<() => void>();
+
+export function subscribeCategories(listener: () => void): () => void {
+  categoryListeners.add(listener);
+  return () => {
+    categoryListeners.delete(listener);
+  };
+}
+
+function notifyCategoriesChanged() {
+  categoryListeners.forEach((fn) => {
+    try {
+      fn();
+    } catch {
+      /* ignore */
+    }
+  });
+}
+
 export function listCategories(): CategorySetting[] {
-  return readCategories().sort((a, b) => a.order - b.order);
+  return memoryCategories;
 }
-export function saveCategories(list: CategorySetting[]) {
-  writeCategories(list);
+
+export function setCategoriesFromSettings(raw: unknown): void {
+  if (!raw) return;
+  try {
+    const list = typeof raw === 'string' ? (JSON.parse(raw) as CategorySetting[]) : (raw as CategorySetting[]);
+    if (Array.isArray(list) && list.length > 0) {
+      const known = new Set(list.map((c) => c.name));
+      siteCategories.forEach((name) => {
+        if (!known.has(name)) list.push({ name, visible: false, order: list.length });
+      });
+      const sorted = [...list].sort((a, b) => a.order - b.order);
+      memoryCategories = sorted;
+      writeCategories(sorted);
+      notifyCategoriesChanged();
+    }
+  } catch {
+    /* ignore */
+  }
 }
+
+export async function hydrateCategories(): Promise<void> {
+  const sb = getSupabase();
+  if (!sb) return;
+  try {
+    const { data, error } = await sb.from('shop_settings').select('categories').eq('id', 1).maybeSingle();
+    if (error || !data) return;
+    setCategoriesFromSettings(data.categories);
+  } catch {
+    /* ignore */
+  }
+}
+
+export async function saveCategories(list: CategorySetting[]): Promise<void> {
+  const sorted = [...list].sort((a, b) => a.order - b.order);
+  memoryCategories = sorted;
+  writeCategories(sorted);
+  notifyCategoriesChanged();
+  broadcastStoreEvent('categories:changed', { categories: sorted });
+
+  const sb = getSupabase();
+  if (!sb) return;
+  try {
+    await sb.from('shop_settings').update({ categories: sorted }).eq('id', 1);
+  } catch {
+    /* ignore — RLS enforces admin */
+  }
+}
+
 export function visibleCategoryNames(): string[] {
   return listCategories().filter((c) => c.visible).map((c) => c.name);
 }
-// "Find your form" cards: first 3 visible categories that actually have
-// live products, each represented by its first active product's image.
+
+// React hooks
+export function useCategories(): CategorySetting[] {
+  return useSyncExternalStore(
+    subscribeCategories,
+    listCategories,
+    listCategories
+  );
+}
+
+export function useVisibleCategories(): string[] {
+  const cats = useCategories();
+  return useMemo(() => cats.filter((c) => c.visible).map((c) => c.name), [cats]);
+}
+
 export type FormCard = { name: string; image: string; productId: string };
 export function formCards(all: Product[], n = 3): FormCard[] {
   const out: FormCard[] = [];
@@ -57,8 +141,7 @@ export function formCards(all: Product[], n = 3): FormCard[] {
   }
   return out;
 }
-// Homepage "favourites": admin-flagged pieces — NEW first, then
-// BESTSELLER, no duplicates. Falls back to the catalogue, never empty.
+
 export function homepageFavourites(all: Product[], n = 4): Product[] {
   const live = all.filter((p) => (p.status ?? 'Active') === 'Active');
   const fresh = live.filter((p) => p.badge === 'NEW');
@@ -67,19 +150,15 @@ export function homepageFavourites(all: Product[], n = 4): Product[] {
   const picks = [...fresh, ...proven].filter((p) => (seen.has(p.id) ? false : (seen.add(p.id), true)));
   return (picks.length ? picks : live).slice(0, n);
 }
-// Mobile drawer navigation: New In + every visible category.
-// (Account / Our Story are appended by the drawer itself.)
+
+export type NavLink = { label: string; handle: string };
 export function sidebarNav(): NavLink[] {
   return [
     { label: 'New In', handle: 'new' },
     ...visibleCategoryNames().map((name) => ({ label: name, handle: name })),
   ];
 }
-// Header navigation, driven by admin settings:
-// - New In / Best Sellers are badge shortcuts, always present
-// - Hoodies / Sets follow their categories' visibility
-// - Clothing (all) is always present
-export type NavLink = { label: string; handle: string };
+
 export function headerNav(): NavLink[] {
   const cats = visibleCategoryNames();
   const links: NavLink[] = [{ label: 'New In', handle: 'new' }, { label: 'Clothing', handle: 'all' }];
@@ -87,4 +166,30 @@ export function headerNav(): NavLink[] {
   if (cats.includes('Matching Sets')) links.push({ label: 'Sets', handle: 'Matching Sets' });
   links.push({ label: 'Best Sellers', handle: 'best' });
   return links;
+}
+
+export function useHeaderNav(): NavLink[] {
+  const cats = useVisibleCategories();
+  return useMemo(() => {
+    const links: NavLink[] = [{ label: 'New In', handle: 'new' }, { label: 'Clothing', handle: 'all' }];
+    if (cats.includes('Hoodies')) links.push({ label: 'Hoodies', handle: 'Hoodies' });
+    if (cats.includes('Matching Sets')) links.push({ label: 'Sets', handle: 'Matching Sets' });
+    links.push({ label: 'Best Sellers', handle: 'best' });
+    return links;
+  }, [cats]);
+}
+
+export function useSidebarNav(): NavLink[] {
+  const cats = useVisibleCategories();
+  return useMemo(() => [
+    { label: 'New In', handle: 'new' },
+    ...cats.map((name) => ({ label: name, handle: name })),
+  ], [cats]);
+}
+
+// Hook into realtime events automatically
+if (typeof window !== 'undefined') {
+  subscribeToStoreEvent('categories:changed', () => {
+    void hydrateCategories();
+  });
 }

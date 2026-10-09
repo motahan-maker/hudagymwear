@@ -3,31 +3,26 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { LayoutDashboard, Package, ShoppingBag, Users, BarChart3, Settings, ArrowUpRight, ArrowLeft, Search, Bell, Plus, Pencil, Trash2, Menu, LogOut, Check, Boxes, Tags, BadgePercent, Lock, ImagePlus, X, Copy, Star, Mail, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { products, money, upsertProduct, deleteProduct, totalStock, sizeStock, slugify, tones, badges, sizes, productImage, productColours, getProduct, COLOUR_PRESETS, guessTone, presetFor, effectivePrice, type Product, type ProductColour, type ProductStatus } from '@/lib/catalog';
+import { products, money, upsertProduct, deleteProduct, totalStock, sizeStock, slugify, tones, badges, sizes, productImage, productColours, getProduct, COLOUR_PRESETS, guessTone, presetFor, effectivePrice, useProducts, type Product, type ProductColour, type ProductStatus } from '@/lib/catalog';
 import { listOrders, getOrder, setOrderStatus, approvePayment, cancelOrder, createOrder, PIPELINE, nextStatuses, PAYMENT_LABEL, type Order, type OrderStatus } from '@/lib/orders';
 import { allReviews, setReviewStatus, replyReview, deleteReview, type Review, type ReviewStatus } from '@/lib/reviews';
 import { Stars } from '@/components/reviews';
 import { downloadCSV } from '@/lib/csv';
 import { listMessages, markMessageRead, deleteMessage, unreadMessages } from '@/lib/messages';
-import { listDiscounts, saveDiscount, deleteDiscount, type Discount } from '@/lib/discounts';
-import { listCategories, saveCategories } from '@/lib/merch';
+import { listDiscounts, saveDiscount, deleteDiscount, useDiscounts, type Discount } from '@/lib/discounts';
+import { listCategories, saveCategories, useCategories } from '@/lib/merch';
 import { uploadProductImage, fileToWebPDataUrl, deleteProductImage, isStorageReady, TRANSFER_BUCKET } from '@/lib/product-images';
 import { getSupabase } from '@/lib/supabase';
 import { listUsers, deleteAccount, addCustomerNote, setCustomerTags, login, logout, isAdminUser, isDemoMode, onAuthChange, type User } from '@/lib/account';
 import { isSupabaseConfigured } from '@/lib/supabase';
-import { getSettings, updateSettings, DEFAULT_SHIPPING } from '@/lib/shop-settings';
+import { getSettings, updateSettings, useSettings, DEFAULT_SHIPPING } from '@/lib/shop-settings';
+import { subscribeToStoreEvent } from '@/lib/realtime';
 import { toast } from 'sonner';
+
 // Brand logo served locally from public/ (no external asset hosting).
 const logo = { url: '/favicon.png' };
 
 // --- admin auth (demo gate) ---------------------------------------------------
-// Demo gate credentials. Override with VITE_ADMIN_EMAIL / VITE_ADMIN_PASS in
-// .env (see .env.example). NOTE: a client-side gate never truly protects data —
-// real enforcement happens via Supabase Auth + RLS on the backend phase.
-// Demo gate credentials (dev builds only). The PROD bundle never contains a
-// fallback password: import.meta.env.DEV is statically replaced at build time,
-// so the literal below is dead-code-eliminated from production output.
-// Real admin enforcement is Supabase profiles.role='admin' + RLS.
 const ADMIN_EMAIL = (import.meta.env['VITE_ADMIN_EMAIL'] as string | undefined) || (import.meta.env.DEV ? 'admin@huda-gymwear.co.uk' : '');
 const ADMIN_PASS = (import.meta.env['VITE_ADMIN_PASS'] as string | undefined) || (import.meta.env.DEV ? 'huda2026' : '');
 const ADMIN_KEY = 'huda.admin.v1';
@@ -135,12 +130,10 @@ export function AdminLogin({ onDone }: { onDone?: () => void }) {
 }
 
 // --- shell --------------------------------------------------------------------
-// NaN-safe number parsing for admin numeric fields.
 function num(v: string, fallback = 0): number {
   const n = parseFloat(v);
   return Number.isFinite(n) ? n : fallback;
 }
-// "Running low" threshold comes from Settings (default 5 units).
 function lowAt(): number {
   const v = getSettings().lowStockAt;
   return Number.isFinite(v) && v > 0 ? v : 5;
@@ -158,8 +151,10 @@ const nav = [
   { label: 'Analytics', to: '/admin/analytics', icon: BarChart3 },
   { label: 'Settings', to: '/admin/settings', icon: Settings },
 ] as const;
+
 export function AdminLayout({ children, title }: { children: ReactNode; title: string }) {
   const [menu, setMenu] = useState(false); const [notifications, setNotifications] = useState(false);
+  const liveProducts = useProducts();
   useEffect(() => {
     if (!menu && !notifications) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setMenu(false); setNotifications(false); } };
@@ -167,8 +162,8 @@ export function AdminLayout({ children, title }: { children: ReactNode; title: s
     return () => document.removeEventListener('keydown', onKey);
   }, [menu, notifications]);
   const navigate = useNavigate();
-  const low = products.filter(p => totalStock(p) <= lowAt() && totalStock(p) > 0).length;
-  const out = products.filter(p => totalStock(p) <= 0).length;
+  const low = liveProducts.filter(p => totalStock(p) <= lowAt() && totalStock(p) > 0).length;
+  const out = liveProducts.filter(p => totalStock(p) <= 0).length;
   return <div className="admin-layout"><aside className={`admin-sidebar ${menu ? 'open' : ''}`}><Link to="/" className="admin-brand"><img src={logo.url} alt="HUDA GYMWEAR" /><span>BRAND STUDIO<small>Store management</small></span></Link><span className="admin-nav-label">MANAGE</span><nav>{nav.slice(0, 9).map(n => <Link to={n.to} key={n.label} activeProps={{ className: 'active' }} activeOptions={{ exact: n.to === '/admin' }} onClick={() => setMenu(false)}><n.icon size={17} />{n.label}</Link>)}</nav><span className="admin-nav-label">INSIGHTS & SETUP</span><nav>{nav.slice(9).map(n => <Link to={n.to} key={n.label} activeProps={{ className: 'active' }} activeOptions={{ exact: true }} onClick={() => setMenu(false)}><n.icon size={17} />{n.label}</Link>)}</nav><button className="admin-store-link as-button" onClick={() => { adminLogout(); void logout(); navigate({ to: '/admin/login' }); }}>Sign out <LogOut size={16} /></button><Link className="admin-store-link" to="/">View storefront <ArrowUpRight size={16} /></Link></aside><div className="admin-main"><header className="admin-topbar"><Button variant="tool" className="admin-menu" aria-label="Toggle admin menu" aria-expanded={menu} onClick={() => setMenu(!menu)}><Menu /></Button><div className="admin-breadcrumb">Brand Studio <span>/</span> {title}</div><div className="admin-top-tools"><Button variant="tool" aria-label="Notifications" aria-expanded={notifications} aria-haspopup="dialog" onClick={() => setNotifications(!notifications)}><Bell />{(low + out) > 0 && <span className="counter">{low + out}</span>}</Button><span className="admin-avatar">HG</span></div>{notifications && <div className="notification-panel" role="dialog" aria-label="Notifications"><h3>Notifications</h3>{out > 0 && <p>{out} product{out > 1 ? 's' : ''} out of stock</p>}{low > 0 && <p>{low} product{low > 1 ? 's' : ''} running low</p>}{low + out === 0 && <p>All stocked up. Looking good.</p>}<Button variant="link" size="sm" onClick={() => { setNotifications(false); navigate({ to: '/admin/inventory' }); }}>View inventory</Button></div>}</header>{menu && <div className="sidebar-scrim" onClick={() => setMenu(false)} aria-hidden="true" />}<main className="admin-content">{children}</main></div></div>;
 }
 function PageHead({ eyebrow, h1, sub, children }: { eyebrow?: string; h1: string; sub?: string; children?: ReactNode }) {
@@ -179,12 +174,17 @@ function money0(n: number) { return money(Math.round(n * 100) / 100); }
 // --- overview -------------------------------------------------------------------
 export function AdminOverview() {
   const [orders, setOrders] = useState<Order[]>([]);
-  useEffect(() => { listOrders().then(setOrders); }, []);
+  const liveProducts = useProducts();
   const reload = () => { listOrders().then(setOrders); };
+  useEffect(() => {
+    listOrders().then(setOrders);
+    const off = subscribeToStoreEvent('orders:changed', reload);
+    return off;
+  }, []);
   const live = orders.filter(o => o.status !== 'Cancelled');
   const revenue = live.reduce((n, o) => n + o.total, 0);
   const aov = live.length ? revenue / live.length : 0;
-  const active = products.filter(p => (p.status ?? 'Active') === 'Active').length;
+  const active = liveProducts.filter(p => (p.status ?? 'Active') === 'Active').length;
   const days = [...Array(14)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - (13 - i)); return d.toISOString().slice(0, 10); });
   const byDay = days.map(d => live.filter(o => o.createdAt.slice(0, 10) === d).reduce((n, o) => n + o.total, 0));
   const max = Math.max(1, ...byDay);
@@ -196,9 +196,9 @@ export function AdminOverview() {
     s.qty += it.qty; s.rev += it.qty * it.price; sold.set(it.productId, s);
   }
   const top = [...sold.values()].sort((a, b) => b.rev - a.rev).slice(0, 4);
-  const lowStock = products.filter(p => totalStock(p) <= lowAt());
+  const lowStock = liveProducts.filter(p => totalStock(p) <= lowAt());
   return <AdminLayout title="Overview"><PageHead eyebrow={new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()} h1="Your brand, at a glance." sub="Live numbers from your store." />
-    <div className="metric-grid">{[['Revenue', money0(revenue), `${live.length} orders`], ['Orders', String(live.length), `${bank} bank · ${cod} COD`], ['Average order value', money0(aov), 'per order'], ['Active products', String(active), `${products.length - active} in draft`]].map(([label, value, trend]) => <div className="metric" key={label}><span>{label}</span><strong>{value}</strong><small>{trend}</small></div>)}</div>
+    <div className="metric-grid">{[['Revenue', money0(revenue), `${live.length} orders`], ['Orders', String(live.length), `${bank} bank · ${cod} COD`], ['Average order value', money0(aov), 'per order'], ['Active products', String(active), `${liveProducts.length - active} in draft`]].map(([label, value, trend]) => <div className="metric" key={label}><span>{label}</span><strong>{value}</strong><small>{trend}</small></div>)}</div>
     <div className="admin-chart-layout"><section className="admin-panel"><div className="admin-panel-title"><h2>Sales — last 14 days</h2><span>{money0(revenue)} total</span></div><div className="sales-chart">{byDay.map((v, i) => <div key={i} className="chart-column" title={`${days[i]}: ${money0(v)}`}><div className="chart-fill" style={{ height: `${Math.max(3, (v / max) * 100)}%` }} /></div>)}</div><div className="chart-axis"><span>{days[0]?.slice(5) ?? ''}</span><span>{days[6]?.slice(5) ?? ''}</span><span>{days[13]?.slice(5) ?? ''}</span></div></section>
       <section className="admin-panel"><div className="admin-panel-title"><h2>Best sellers</h2><Link to="/admin/products">View all products →</Link></div>{top.length === 0 ? <p className="fine-print">No item-level sales yet — new checkout orders appear here.</p> : top.map(p => <div className="admin-best" key={p.name}><img src={p.image} alt="" /><div><strong>{p.name}</strong><small>{p.qty} units sold</small></div><span>{money0(p.rev)}</span></div>)}</section></div>
     <section className="admin-panel"><div className="admin-panel-title"><h2>Recent orders</h2><Link to="/admin/orders">View all orders →</Link></div><AdminOrdersTable compact onChange={reload} /></section>
@@ -213,7 +213,15 @@ export function AdminOrdersTable({ compact, onChange }: { compact?: boolean; onC
   const [orders, setOrders] = useState<Order[]>([]);
   const [orderDetail, setOrderDetail] = useState<Order | undefined>(undefined);
   const [q, setQ] = useState(''); const [status, setStatus] = useState('all'); const [pay, setPay] = useState('all');
-  useEffect(() => { listOrders().then(setOrders); }, []);
+  useEffect(() => {
+    listOrders().then(setOrders);
+    const off = subscribeToStoreEvent('orders:changed', () => {
+      listOrders().then(setOrders);
+      if (detail) getOrder(detail).then((o) => setOrderDetail(o ?? undefined));
+      onChange?.();
+    });
+    return off;
+  }, [detail]);
   useEffect(() => { if (!detail) { setOrderDetail(undefined); return; } getOrder(detail).then((o) => setOrderDetail(o ?? undefined)); }, [detail]);
   const refresh = () => { listOrders().then(setOrders); if (detail) getOrder(detail).then((o) => setOrderDetail(o ?? undefined)); onChange?.(); };
   const order = orderDetail;
@@ -239,30 +247,28 @@ export function AdminOrders() {
 }
 
 // --- products -------------------------------------------------------------------
-function blankStock(): Record<string, number> {
-  return Object.fromEntries(sizes.map(s => [s, 25]));
-}
 export function AdminProducts({ initialQuery }: { initialQuery: string | undefined }) {
-  const [tick, setTick] = useState(0);
+  const products = useProducts();
   const [q, setQ] = useState(initialQuery ?? ''); const [cat, setCat] = useState('all'); const [status, setStatus] = useState('all');
   const [selected, setSelected] = useState<string[]>([]);
   const [editing, setEditing] = useState<Product | 'new' | null>(null);
   const [confirmDel, setConfirmDel] = useState<string | null>(null);
   const [confirmBulk, setConfirmBulk] = useState<'draft' | 'delete' | null>(null);
-  void tick;
+  
   const cats = ['all', ...Array.from(new Set(products.map(p => p.category)))];
   const rows = products.filter(p => (!q || (p.name + ' ' + p.colour).toLowerCase().includes(q.toLowerCase())) && (cat === 'all' || p.category === cat) && (status === 'all' || (p.status ?? 'Active') === status));
-  function refresh() { setTick(t => t + 1); setSelected([]); }
+  
   return <AdminLayout title="Products"><PageHead h1="Products" sub={`${products.length} pieces in your collection.`}><Button variant="quiet" onClick={() => downloadCSV('huda-products', products.map((p) => ({ id: p.id, name: p.name, category: p.category, colour: p.colour, price: p.price, salePrice: p.salePrice ?? '', badge: p.badge ?? '', status: p.status ?? 'Active', stock: totalStock(p) })))}>EXPORT CSV</Button><Button variant="fashion" onClick={() => setEditing('new')}><Plus size={14} /> ADD PRODUCT</Button></PageHead>
     <section className="admin-panel"><div className="admin-filter"><label><Search size={17} /><input aria-label="Search products" placeholder="Search products…" value={q} onChange={e => setQ(e.target.value)} /></label><select aria-label="Category" value={cat} onChange={e => setCat(e.target.value)}>{cats.map(c => <option key={c} value={c}>{c === 'all' ? 'All categories' : c}</option>)}</select><select aria-label="Status" value={status} onChange={e => setStatus(e.target.value)}><option value="all">All statuses</option><option>Active</option><option>Draft</option></select>{selected.length > 0 && <><span>{selected.length} selected</span><Button variant="quiet" onClick={() => setConfirmBulk('draft')}>Set to draft</Button><Button variant="quiet" onClick={() => setConfirmBulk('delete')}>Delete {selected.length} selected</Button></>}</div>
       <div className="table-scroll"><table className="admin-table"><thead><tr><th scope="col"><input type="checkbox" aria-label="Select all" checked={rows.length > 0 && selected.length === rows.length} onChange={e => setSelected(e.target.checked ? rows.map(p => p.id) : [])} /></th><th scope="col">Product</th><th scope="col">Status</th><th scope="col">Inventory</th><th scope="col">Category</th><th scope="col">Price</th><th scope="col">Actions</th></tr></thead><tbody>{rows.map(p => <tr key={p.id}><td><input type="checkbox" aria-label={`Select ${p.name}`} checked={selected.includes(p.id)} onChange={() => setSelected(s => s.includes(p.id) ? s.filter(i => i !== p.id) : [...s, p.id])} /></td><td><div className="admin-product-cell"><img src={productImage(p)} alt="" /><span>{p.name}<small>{p.colour} · {productColours(p).length} colour{productColours(p).length > 1 ? 's' : ''}</small></span></div></td><td><span className={`status-tag ${(p.status ?? 'Active') === 'Active' ? 'done' : 'neutral'}`}>{p.status ?? 'Active'}</span></td><td>{totalStock(p)} units<small className="table-small">{sizes.map(s => `${s}:${sizeStock(p, s)}`).join(' · ')}</small></td><td>{p.category}</td><td>{p.salePrice ? <><del>{money(p.price)}</del> {money(p.salePrice)}</> : money(p.price)}</td><td><div className="admin-actions"><Button variant="tool" aria-label={`Edit ${p.name}`} onClick={() => setEditing(p)}><Pencil size={15} /></Button><Button variant="tool" aria-label={`Delete ${p.name}`} onClick={() => setConfirmDel(p.id)}><Trash2 size={15} /></Button></div></td></tr>)}</tbody></table></div>{rows.length===0&&<p className="fine-print">No products match these filters — try clearing the search or add a new product.</p>}</section>
-    <Dialog open={editing !== null} onOpenChange={() => setEditing(null)}><DialogContent className="editor-dialog">{editing && <ProductEditor key={editing === 'new' ? 'new' : editing.id} initial={editing === 'new' ? undefined : editing} onSaved={() => { setEditing(null); refresh(); }} onClose={() => setEditing(null)} />}</DialogContent></Dialog>
-    <Dialog open={!!confirmDel} onOpenChange={() => setConfirmDel(null)}><DialogContent><DialogTitle>Delete this product?</DialogTitle><DialogDescription>It will disappear from the storefront immediately. Orders already placed keep their lines.</DialogDescription><div className="admin-actions"><Button variant="quiet" onClick={() => setConfirmDel(null)}>KEEP IT</Button><Button variant="fashion" onClick={async () => { if (confirmDel) await deleteProduct(confirmDel); setConfirmDel(null); refresh(); toast.success('Product deleted.'); }}>DELETE</Button></div></DialogContent></Dialog>
-    <Dialog open={confirmBulk !== null} onOpenChange={() => setConfirmBulk(null)}><DialogContent><DialogTitle>{confirmBulk === 'delete' ? `Delete ${selected.length} products?` : `Move ${selected.length} products to draft?`}</DialogTitle><DialogDescription>{confirmBulk === 'delete' ? 'They will disappear from the storefront immediately. Placed orders keep their lines. This cannot be undone.' : 'They will be hidden from shoppers until re-activated.'} {selected.slice(0, 5).map((id) => getProduct(id)?.name).filter(Boolean).join(' · ')}{selected.length > 5 ? ` · +${selected.length - 5} more` : ''}</DialogDescription><div className="admin-actions"><Button variant="quiet" onClick={() => setConfirmBulk(null)}>CANCEL</Button><Button variant="fashion" onClick={async () => { if (confirmBulk === 'delete') { for (const id of selected) await deleteProduct(id); toast.success(`${selected.length} products deleted.`); } else if (confirmBulk === 'draft') { for (const id of selected) { const p = getProduct(id); if (p) await upsertProduct({ ...p, status: 'Draft' }); } toast.success('Selected products set to draft.'); } setConfirmBulk(null); refresh(); }}>{confirmBulk === 'delete' ? 'DELETE ALL' : 'MOVE TO DRAFT'}</Button></div></DialogContent></Dialog></AdminLayout>;
+    <Dialog open={editing !== null} onOpenChange={() => setEditing(null)}><DialogContent className="editor-dialog">{editing && <ProductEditor key={editing === 'new' ? 'new' : editing.id} initial={editing === 'new' ? undefined : editing} onSaved={() => { setEditing(null); setSelected([]); }} onClose={() => setEditing(null)} />}</DialogContent></Dialog>
+    <Dialog open={!!confirmDel} onOpenChange={() => setConfirmDel(null)}><DialogContent><DialogTitle>Delete this product?</DialogTitle><DialogDescription>It will disappear from the storefront immediately across all devices.</DialogDescription><div className="admin-actions"><Button variant="quiet" onClick={() => setConfirmDel(null)}>KEEP IT</Button><Button variant="fashion" onClick={async () => { if (confirmDel) await deleteProduct(confirmDel); setConfirmDel(null); toast.success('Product deleted.'); }}>DELETE</Button></div></DialogContent></Dialog>
+    <Dialog open={confirmBulk !== null} onOpenChange={() => setConfirmBulk(null)}><DialogContent><DialogTitle>{confirmBulk === 'delete' ? `Delete ${selected.length} products?` : `Move ${selected.length} products to draft?`}</DialogTitle><DialogDescription>{confirmBulk === 'delete' ? 'They will disappear from the storefront immediately. This cannot be undone.' : 'They will be hidden from shoppers until re-activated.'} {selected.slice(0, 5).map((id) => getProduct(id)?.name).filter(Boolean).join(' · ')}{selected.length > 5 ? ` · +${selected.length - 5} more` : ''}</DialogDescription><div className="admin-actions"><Button variant="quiet" onClick={() => setConfirmBulk(null)}>CANCEL</Button><Button variant="fashion" onClick={async () => { if (confirmBulk === 'delete') { for (const id of selected) await deleteProduct(id); toast.success(`${selected.length} products deleted.`); } else if (confirmBulk === 'draft') { for (const id of selected) { const p = getProduct(id); if (p) await upsertProduct({ ...p, status: 'Draft' }); } toast.success('Selected products set to draft.'); } setConfirmBulk(null); setSelected([]); }}>{confirmBulk === 'delete' ? 'DELETE ALL' : 'MOVE TO DRAFT'}</Button></div></DialogContent></Dialog></AdminLayout>;
 }
 
 export function ProductEditor({ initial, onSaved, onClose }: { initial: Product | undefined; onSaved: () => void; onClose: () => void }) {
   const busy = useRef(false);
+  const categoriesList = useCategories();
   const [duplicating, setDuplicating] = useState(false);
   const [name, setName] = useState(initial?.name ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
@@ -285,9 +291,10 @@ export function ProductEditor({ initial, onSaved, onClose }: { initial: Product 
   const usedImages = new Set(colours.flatMap(c => c.images));
   const orphanImages = images.filter(src => !usedImages.has(src));
   const imageless = colours.filter(c => !c.images.length);
-  const catOptions = listCategories().map(c => c.name);
+  const catOptions = categoriesList.map(c => c.name);
   const families = [...new Set(COLOUR_PRESETS.map(p => p.tone))];
   const shownPresets = COLOUR_PRESETS.filter(p => p.name.toLowerCase().includes(presetQ.trim().toLowerCase()));
+
   function addColour(name: string, tone: string, hex?: string) {
     const clean = name.trim();
     if (!clean) return;
@@ -296,7 +303,6 @@ export function ProductEditor({ initial, onSaved, onClose }: { initial: Product 
     setColours(cs => [...cs, { name: clean, tone, images: free ? [free] : [], ...(hex ? { hex } : {}) }]);
   }
   function assignImage(i: number, src: string) {
-    // Toggle: clicking the linked image again unlinks it (falls back to cover).
     setColours(cs => cs.map((c, n) => n === i ? { ...c, images: c.images.includes(src) ? [] : [src] } : c));
   }
   function addUrl() {
@@ -312,12 +318,10 @@ export function ProductEditor({ initial, onSaved, onClose }: { initial: Product 
     if (totalImages >= 6) { toast.error('Maximum 6 images per product.'); return; }
     setUploading(true);
     setUploadMsg('');
-    // Supabase Storage when connected; otherwise a browser-local WebP so the
-    // upload button always works (demo data stays in this browser only).
     const job = isStorageReady ? uploadProductImage(f) : fileToWebPDataUrl(f);
     void job.then(({ url: src, savedPct, kb }) => {
       setImages(im => (im.includes(src) ? im : [...im, src]));
-      setUploadMsg(`Uploaded as WebP — ${kb}KB (${savedPct}% smaller than the original).${isStorageReady ? '' : ' Demo only: connect Supabase Storage to sync everywhere.'}`);
+      setUploadMsg(`Uploaded as WebP — ${kb}KB (${savedPct}% smaller than the original).`);
       toast.success('Image uploaded.');
     }).catch((err: unknown) => toast.error(err instanceof Error ? err.message : 'Upload failed.'))
       .finally(() => setUploading(false));
@@ -393,10 +397,8 @@ export function ProductEditor({ initial, onSaved, onClose }: { initial: Product 
 
 // --- inventory ------------------------------------------------------------------
 export function AdminInventory() {
-  const [tick, setTick] = useState(0);
-  void tick;
+  const products = useProducts();
   const [drafts, setDrafts] = useState<Record<string, Record<string, number>>>({});
-  void drafts;
   function setDraft(id: string, size: string, v: number) {
     const safe = Number.isFinite(v) ? Math.max(0, v) : 0;
     setDrafts(d => ({ ...d, [id]: { ...Object.fromEntries(sizes.map(s => [s, sizeStock(getProduct(id)!, s)])), ...(d[id] ?? {}), [size]: safe } }));
@@ -406,7 +408,6 @@ export function AdminInventory() {
     const base = drafts[id] ?? {};
     void upsertProduct({ ...p, stockBySize: { ...Object.fromEntries(sizes.map(s => [s, sizeStock(p, s)])), ...base } });
     setDrafts(d => { const n = { ...d }; delete n[id]; return n; });
-    setTick(t => t + 1);
     toast.success(`${p.name} stock updated.`);
   }
   const low = products.filter(p => totalStock(p) <= lowAt());
@@ -417,10 +418,14 @@ export function AdminInventory() {
 
 // --- categories -------------------------------------------------------------------
 export function AdminCategories() {
-  const [list, setList] = useState(listCategories);
+  const list = useCategories();
   const [name, setName] = useState('');
   const [formError, setFormError] = useState('');
-  function persist(next: typeof list) { saveCategories(next); setList(listCategories()); }
+  const products = useProducts();
+
+  function persist(next: typeof list) {
+    void saveCategories(next);
+  }
   function move(i: number, dir: -1 | 1) {
     const n = [...list]; const j = i + dir; if (j < 0 || j >= n.length) return;
     [n[i], n[j]] = [n[j]!, n[i]!];
@@ -429,7 +434,6 @@ export function AdminCategories() {
   function submit(e: React.FormEvent) {
     e.preventDefault();
     const n = name.trim();
-    // Never a dead click: every submit explains itself inline.
     if (n.length < 2) { setFormError('Type a category name (2+ characters).'); return; }
     if (list.some(c => c.name.toLowerCase() === n.toLowerCase())) { setFormError(`“${n}” already exists — pick another name.`); return; }
     setFormError('');
@@ -437,21 +441,21 @@ export function AdminCategories() {
     setName('');
     toast.success(`${n} added — assign products to make it appear.`);
   }
-  return <AdminLayout title="Categories"><PageHead h1="Categories" sub="Visibility and order drive the shop tabs and navigation." />
+  return <AdminLayout title="Categories"><PageHead h1="Categories" sub="Visibility and order drive the shop tabs and navigation across all devices." />
     <section className="admin-panel">{list.map((c, i) => <div key={c.name} className="manage-row"><div><strong>{c.name}</strong><small>{products.filter(p => p.category === c.name).length} products · {c.visible ? 'Shown in shop tabs' : 'Hidden'}</small></div><div className="admin-actions"><Button variant="tool" aria-label={`Move ${c.name} up`} disabled={i === 0} onClick={() => move(i, -1)}>↑</Button><Button variant="tool" aria-label={`Move ${c.name} down`} disabled={i === list.length - 1} onClick={() => move(i, 1)}>↓</Button><Button variant={c.visible ? 'quiet' : 'fashion'} size="sm" onClick={() => persist(list.map(x => x.name === c.name ? { ...x, visible: !x.visible } : x))}>{c.visible ? 'HIDE' : 'SHOW'}</Button></div></div>)}
       <form className="url-row mt-6" onSubmit={submit}><input value={name} onChange={e => { setName(e.target.value); if (formError) setFormError(''); }} placeholder="New category name…" aria-label="New category name" /><Button variant="fashion" type="submit"><Plus size={14} /> ADD CATEGORY</Button></form>{formError && <p className="field-error mt-6" role="alert">{formError}</p>}</section></AdminLayout>;
 }
 
 // --- discounts ----------------------------------------------------------------------
 export function AdminDiscounts() {
-  const [list, setList] = useState(listDiscounts);
+  const list = useDiscounts();
   const [editing, setEditing] = useState<Discount | 'new' | null>(null);
   const [confirmCode, setConfirmCode] = useState<string | null>(null);
-  function refresh() { setList(listDiscounts()); }
-  return <AdminLayout title="Discounts"><PageHead h1="Discounts" sub="Codes customers apply in the bag and at checkout."><Button variant="quiet" onClick={() => downloadCSV('huda-discounts', listDiscounts())}>EXPORT CSV</Button><Button variant="fashion" onClick={() => setEditing('new')}><Plus size={14} /> ADD CODE</Button></PageHead>
+
+  return <AdminLayout title="Discounts"><PageHead h1="Discounts" sub="Codes customers apply in the bag and at checkout."><Button variant="quiet" onClick={() => downloadCSV('huda-discounts', list)}>EXPORT CSV</Button><Button variant="fashion" onClick={() => setEditing('new')}><Plus size={14} /> ADD CODE</Button></PageHead>
     <section className="admin-panel"><div className="table-scroll"><table className="admin-table"><thead><tr><th scope="col">Code</th><th scope="col">Value</th><th scope="col">Min. spend</th><th scope="col">Uses</th><th scope="col">Status</th><th scope="col">Actions</th></tr></thead><tbody>{list.map(d => <tr key={d.code}><td><strong>{d.code}</strong></td><td>{d.kind === 'percent' ? `${d.value}%` : money(d.value)}</td><td>{d.minSpend > 0 ? money(d.minSpend) : '—'}</td><td>{d.uses}{d.maxUses != null ? ` / ${d.maxUses}` : ''}</td><td><span className={`status-tag ${d.active ? 'done' : 'neutral'}`}>{d.active ? 'Active' : 'Off'}</span></td><td><div className="admin-actions"><Button variant="tool" aria-label={`Edit ${d.code}`} onClick={() => setEditing(d)}><Pencil size={15} /></Button><Button variant="tool" aria-label={`Delete ${d.code}`} onClick={() => setConfirmCode(d.code)}><Trash2 size={15} /></Button></div></td></tr>)}</tbody></table></div>{list.length === 0 && <p className="fine-print">No discount codes yet — create one to reward shoppers.</p>}</section>
-    <Dialog open={editing !== null} onOpenChange={() => setEditing(null)}><DialogContent className="dialog-narrow">{editing && <DiscountEditor key={editing === 'new' ? 'new' : editing.code} initial={editing === 'new' ? undefined : editing} onSaved={() => { setEditing(null); refresh(); }} />}</DialogContent></Dialog>
-    <Dialog open={!!confirmCode} onOpenChange={() => setConfirmCode(null)}><DialogContent><DialogTitle>Delete code {confirmCode}?</DialogTitle><DialogDescription>Shoppers holding this code will see “not valid” at checkout, even mid-basket. This cannot be undone.</DialogDescription><div className="admin-actions"><Button variant="quiet" onClick={() => setConfirmCode(null)}>KEEP IT</Button><Button variant="fashion" onClick={() => { if (confirmCode) deleteDiscount(confirmCode); setConfirmCode(null); refresh(); toast.success('Code deleted.'); }}>DELETE</Button></div></DialogContent></Dialog></AdminLayout>;
+    <Dialog open={editing !== null} onOpenChange={() => setEditing(null)}><DialogContent className="dialog-narrow">{editing && <DiscountEditor key={editing === 'new' ? 'new' : editing.code} initial={editing === 'new' ? undefined : editing} onSaved={() => setEditing(null)} />}</DialogContent></Dialog>
+    <Dialog open={!!confirmCode} onOpenChange={() => setConfirmCode(null)}><DialogContent><DialogTitle>Delete code {confirmCode}?</DialogTitle><DialogDescription>Shoppers holding this code will see “not valid” at checkout. This cannot be undone.</DialogDescription><div className="admin-actions"><Button variant="quiet" onClick={() => setConfirmCode(null)}>KEEP IT</Button><Button variant="fashion" onClick={() => { if (confirmCode) deleteDiscount(confirmCode); setConfirmCode(null); toast.success('Code deleted.'); }}>DELETE</Button></div></DialogContent></Dialog></AdminLayout>;
 }
 export function DiscountEditor({ initial, onSaved }: { initial: Discount | undefined; onSaved: () => void }) {
   const busy = useRef(false);
@@ -501,7 +505,13 @@ export function AdminCustomers() {
   const [tick, setTick] = useState(0);
   const [users, setUsers] = useState<User[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
-  useEffect(() => { listUsers().then(setUsers); listOrders().then(setOrders); }, [tick]);
+  useEffect(() => {
+    listUsers().then(setUsers);
+    listOrders().then(setOrders);
+    const offOrders = subscribeToStoreEvent('orders:changed', () => setTick(t => t + 1));
+    const offProfiles = subscribeToStoreEvent('profiles:changed', () => setTick(t => t + 1));
+    return () => { offOrders(); offProfiles(); };
+  }, [tick]);
   const [q, setQ] = useState('');
   const [detail, setDetail] = useState<string | null>(null);
   const rows = users.map(u => {
@@ -521,7 +531,11 @@ export function AdminCustomers() {
 // --- analytics --------------------------------------------------------------------------
 export function AdminAnalytics() {
   const [all, setAll] = useState<Order[]>([]);
-  useEffect(() => { listOrders().then(setAll); }, []);
+  useEffect(() => {
+    listOrders().then(setAll);
+    const off = subscribeToStoreEvent('orders:changed', () => listOrders().then(setAll));
+    return off;
+  }, []);
   const orders = all.filter(o => o.status !== 'Cancelled');
   const revenue = orders.reduce((n, o) => n + o.total, 0);
   const aov = orders.length ? revenue / orders.length : 0;
@@ -542,7 +556,7 @@ export function AdminAnalytics() {
 
 // --- settings -----------------------------------------------------------------------------
 export function AdminSettings() {
-  const s = getSettings();
+  const s = useSettings();
   const [announcement, setAnnouncement] = useState(s.announcement);
   const [whatsapp, setWhatsapp] = useState(s.whatsapp);
   const [instagram, setInstagram] = useState(s.instagram);
@@ -556,12 +570,28 @@ export function AdminSettings() {
   const [freeOver, setFreeOver] = useState(s.freeOver ?? 100);
   const [lowAtVal, setLowAtVal] = useState(s.lowStockAt ?? 5);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setAnnouncement(s.announcement);
+    setWhatsapp(s.whatsapp);
+    setInstagram(s.instagram);
+    setFacebook(s.facebook ?? '');
+    setTiktok(s.tiktok ?? '');
+    setBankName(s.bankName);
+    setAccountName(s.accountName);
+    setAccountNumber(s.accountNumber);
+    setIban(s.iban);
+    setShipping(s.shipping?.length ? s.shipping.map((m) => ({ ...m })) : []);
+    setFreeOver(s.freeOver ?? 100);
+    setLowAtVal(s.lowStockAt ?? 5);
+  }, [s]);
+
   function save(e: React.FormEvent) {
     e.preventDefault();
     if (saving) return;
     setSaving(true);
     void updateSettings({ announcement: announcement.trim() || s.announcement, whatsapp: whatsapp.replace(/\D/g, ''), instagram: instagram.trim() || s.instagram, facebook: facebook.trim(), tiktok: tiktok.trim(), bankName: bankName.trim(), accountName: accountName.trim(), accountNumber: accountNumber.trim(), iban: iban.trim(), shipping: shipping.filter((m) => m.label.trim()), freeOver: Math.max(0, freeOver), lowStockAt: Math.max(1, lowAtVal) }).then(() => {
-      toast.success('Settings saved — the storefront updates instantly.');
+      toast.success('Settings saved — the storefront updates instantly across all devices.');
     }).finally(() => setSaving(false));
   }
   return <AdminLayout title="Settings"><PageHead h1="The details that make it yours." sub="Operational settings only — brand design stays locked." />
@@ -625,7 +655,11 @@ export function AdminSettings() {
 export function AdminReviews() {
   const [tick, setTick] = useState(0);
   const [all, setAll] = useState<Review[]>([]);
-  useEffect(() => { allReviews().then(setAll); }, [tick]);
+  useEffect(() => {
+    allReviews().then(setAll);
+    const off = subscribeToStoreEvent('reviews:changed', () => allReviews().then(setAll));
+    return off;
+  }, [tick]);
   const [tab, setTab] = useState<'pending' | 'approved' | 'rejected' | 'all'>('pending');
   const [q, setQ] = useState('');
   const [replying, setReplying] = useState<string | null>(null);
@@ -635,7 +669,7 @@ export function AdminReviews() {
   const shown = all.filter((r) => (tab === 'all' || r.status === tab) && (!q || (r.title + r.body + r.author + (getProduct(r.productId)?.name ?? '')).toLowerCase().includes(q.toLowerCase())));
   return <AdminLayout title="Reviews"><PageHead h1="Reviews" sub={`${pending} awaiting moderation · replies post as HUDA GYMWEAR.`} />
     <div className="admin-filter"><div className="account-tabs">{(['pending', 'approved', 'rejected', 'all'] as const).map((t) => <Button key={t} variant="quiet" className={tab === t ? 'selected' : ''} aria-pressed={tab === t} onClick={() => setTab(t)}>{t[0]?.toUpperCase()}{t.slice(1)}{t === 'pending' && pending > 0 ? ` (${pending})` : ''}</Button>)}</div><label><Search size={16} /><input aria-label="Search reviews" placeholder="Search reviews, products, authors…" value={q} onChange={(e) => setQ(e.target.value)} /></label></div>
-    {shown.length === 0 ? <section className="admin-panel"><p className="fine-print">Nothing here. New customer reviews land in Pending.</p></section> : shown.map((r) => {
+      {shown.length === 0 ? <section className="admin-panel"><p className="fine-print">Nothing here. New customer reviews land in Pending.</p></section> : shown.map((r) => {
       const p = getProduct(r.productId);
       return <section className="admin-panel review-row" key={r.id}><div className="review-admin-top">{p && <img src={p.image} alt="" />}{<div><strong>{p?.name ?? r.productId}</strong><p className="fine-print">{r.author} · {r.email}{r.verified ? ' · Verified buyer' : ''} · Size {r.size} · {new Date(r.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}{r.seed ? ' · Seed' : ''}</p></div>}<span className={`status-tag ${r.status === 'approved' ? 'done' : r.status === 'rejected' ? 'cancelled' : 'pending'}`}>{r.status}</span></div>
         <div className="review-admin-body"><Stars value={r.rating} /><strong>{r.title}</strong><p>{r.body}</p><p className="fine-print">Helpful votes: {r.helpful}</p>
@@ -649,8 +683,11 @@ export function AdminReviews() {
 export function AdminMessages() {
   const [tick, setTick] = useState(0);
   const [filter, setFilter] = useState<'all' | 'contact' | 'newsletter' | 'launch'>('all');
-  void tick;
   function refresh() { setTick((t) => t + 1); }
+  useEffect(() => {
+    const off = subscribeToStoreEvent('messages:changed', refresh);
+    return off;
+  }, []);
   const all = listMessages();
   const unread = all.filter((m) => !m.read).length;
   const shown = all.filter((m) => filter === 'all' || m.kind === filter);
@@ -659,7 +696,6 @@ export function AdminMessages() {
     <div className="admin-filter"><div className="account-tabs">{(['all', 'contact', 'newsletter', 'launch'] as const).map((t) => <Button key={t} variant="quiet" className={filter === t ? 'selected' : ''} aria-pressed={filter === t} onClick={() => setFilter(t)}>{t === 'all' ? 'All' : kindLabel(t)}</Button>)}</div></div>
     {shown.length === 0 ? <section className="admin-panel"><p className="fine-print">Inbox zero. New form submissions appear here.</p></section> : shown.map((m) => <section className="admin-panel" key={m.id}><div className="manage-row"><div><strong>{m.name || m.email}</strong><small>{kindLabel(m.kind)} · {m.email} · {new Date(m.createdAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small></div><span className={`status-tag ${m.read ? 'neutral' : 'pending'}`}>{m.read ? 'Read' : 'New'}</span></div>{m.message && <p className="mt-6">{m.message}</p>}<div className="admin-actions"><Button variant="quiet" size="sm" onClick={() => { markMessageRead(m.id, !m.read); refresh(); toast.success(m.read ? 'Marked as unread.' : 'Marked as read.'); }}>Mark as {m.read ? 'unread' : 'read'}</Button><Button variant="tool" aria-label={`Delete ${m.kind} message from ${m.email}`} onClick={() => { if (window.confirm('Delete this message?')) { deleteMessage(m.id); refresh(); toast.success('Message deleted.'); } }}><Trash2 size={15} /></Button></div></section>)}</AdminLayout>;
 }
-
 
 function CustomerNotes({ email, onChanged }: { email: string; onChanged: () => void }) {
   const [note, setNote] = useState('');
@@ -687,7 +723,8 @@ export function AdminOrderDraft() {
   const draftKey = useRef(`draft-${Date.now().toString(36)}`);
   const [users, setUsers] = useState<User[]>([]);
   useEffect(() => { listUsers().then(setUsers); }, []);
-  const settings = getSettings();
+  const settings = useSettings();
+  const products = useProducts();
   const results = q.trim() ? products.filter((p) => (p.name + ' ' + p.colour).toLowerCase().includes(q.trim().toLowerCase())).slice(0, 6) : [];
   function addLine(id: string) {
     const p = getProduct(id);
