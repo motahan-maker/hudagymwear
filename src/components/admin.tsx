@@ -153,18 +153,40 @@ const nav = [
 ] as const;
 
 export function AdminLayout({ children, title }: { children: ReactNode; title: string }) {
-  const [menu, setMenu] = useState(false); const [notifications, setNotifications] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const [notifications, setNotifications] = useState(false);
+  const [unreadMsgCount, setUnreadMsgCount] = useState(0);
+  const [pendingOrderCount, setPendingOrderCount] = useState(0);
+  const [pendingReviewCount, setPendingReviewCount] = useState(0);
   const liveProducts = useProducts();
+  const navigate = useNavigate();
+
+  const refreshAlerts = () => {
+    setUnreadMsgCount(unreadMessages());
+    void listOrders().then((all) => setPendingOrderCount(all.filter((o) => o.status === 'Order received' || o.status === 'Awaiting payment proof').length));
+    void allReviews().then((all) => setPendingReviewCount(all.filter((r) => r.status === 'pending').length));
+  };
+
+  useEffect(() => {
+    refreshAlerts();
+    const offOrders = subscribeToStoreEvent('orders:changed', refreshAlerts);
+    const offReviews = subscribeToStoreEvent('reviews:changed', refreshAlerts);
+    const offMsgs = subscribeToStoreEvent('messages:changed', refreshAlerts);
+    return () => { offOrders(); offReviews(); offMsgs(); };
+  }, []);
+
   useEffect(() => {
     if (!menu && !notifications) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setMenu(false); setNotifications(false); } };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [menu, notifications]);
-  const navigate = useNavigate();
+
   const low = liveProducts.filter(p => totalStock(p) <= lowAt() && totalStock(p) > 0).length;
   const out = liveProducts.filter(p => totalStock(p) <= 0).length;
-  return <div className="admin-layout"><aside className={`admin-sidebar ${menu ? 'open' : ''}`}><Link to="/" className="admin-brand"><img src={logo.url} alt="HUDA GYMWEAR" /><span>BRAND STUDIO<small>Store management</small></span></Link><span className="admin-nav-label">MANAGE</span><nav>{nav.slice(0, 9).map(n => <Link to={n.to} key={n.label} activeProps={{ className: 'active' }} activeOptions={{ exact: n.to === '/admin' }} onClick={() => setMenu(false)}><n.icon size={17} />{n.label}</Link>)}</nav><span className="admin-nav-label">INSIGHTS & SETUP</span><nav>{nav.slice(9).map(n => <Link to={n.to} key={n.label} activeProps={{ className: 'active' }} activeOptions={{ exact: true }} onClick={() => setMenu(false)}><n.icon size={17} />{n.label}</Link>)}</nav><button className="admin-store-link as-button" onClick={() => { adminLogout(); void logout(); navigate({ to: '/admin/login' }); }}>Sign out <LogOut size={16} /></button><Link className="admin-store-link" to="/">View storefront <ArrowUpRight size={16} /></Link></aside><div className="admin-main"><header className="admin-topbar"><Button variant="tool" className="admin-menu" aria-label="Toggle admin menu" aria-expanded={menu} onClick={() => setMenu(!menu)}><Menu /></Button><div className="admin-breadcrumb">Brand Studio <span>/</span> {title}</div><div className="admin-top-tools"><Button variant="tool" aria-label="Notifications" aria-expanded={notifications} aria-haspopup="dialog" onClick={() => setNotifications(!notifications)}><Bell />{(low + out) > 0 && <span className="counter">{low + out}</span>}</Button><span className="admin-avatar">HG</span></div>{notifications && <div className="notification-panel" role="dialog" aria-label="Notifications"><h3>Notifications</h3>{out > 0 && <p>{out} product{out > 1 ? 's' : ''} out of stock</p>}{low > 0 && <p>{low} product{low > 1 ? 's' : ''} running low</p>}{low + out === 0 && <p>All stocked up. Looking good.</p>}<Button variant="link" size="sm" onClick={() => { setNotifications(false); navigate({ to: '/admin/inventory' }); }}>View inventory</Button></div>}</header>{menu && <div className="sidebar-scrim" onClick={() => setMenu(false)} aria-hidden="true" />}<main className="admin-content">{children}</main></div></div>;
+  const totalAlerts = low + out + unreadMsgCount + pendingOrderCount + pendingReviewCount;
+
+  return <div className="admin-layout"><aside className={`admin-sidebar ${menu ? 'open' : ''}`}><Link to="/" className="admin-brand"><img src={logo.url} alt="HUDA GYMWEAR" /><span>BRAND STUDIO<small>Store management</small></span></Link><span className="admin-nav-label">MANAGE</span><nav>{nav.slice(0, 9).map(n => <Link to={n.to} key={n.label} activeProps={{ className: 'active' }} activeOptions={{ exact: n.to === '/admin' }} onClick={() => setMenu(false)}><n.icon size={17} />{n.label}{n.to === '/admin/orders' && pendingOrderCount > 0 ? <span className="nav-badge">{pendingOrderCount}</span> : n.to === '/admin/reviews' && pendingReviewCount > 0 ? <span className="nav-badge">{pendingReviewCount}</span> : n.to === '/admin/messages' && unreadMsgCount > 0 ? <span className="nav-badge">{unreadMsgCount}</span> : null}</Link>)}</nav><span className="admin-nav-label">INSIGHTS & SETUP</span><nav>{nav.slice(9).map(n => <Link to={n.to} key={n.label} activeProps={{ className: 'active' }} activeOptions={{ exact: true }} onClick={() => setMenu(false)}><n.icon size={17} />{n.label}</Link>)}</nav><button className="admin-store-link as-button" onClick={() => { adminLogout(); void logout(); navigate({ to: '/admin/login' }); }}>Sign out <LogOut size={16} /></button><Link className="admin-store-link" to="/">View storefront <ArrowUpRight size={16} /></Link></aside><div className="admin-main"><header className="admin-topbar"><Button variant="tool" className="admin-menu" aria-label="Toggle admin menu" aria-expanded={menu} onClick={() => setMenu(!menu)}><Menu /></Button><div className="admin-breadcrumb">Brand Studio <span>/</span> {title}</div><div className="admin-top-tools"><Button variant="tool" aria-label="Notifications" aria-expanded={notifications} aria-haspopup="dialog" onClick={() => setNotifications(!notifications)}><Bell />{totalAlerts > 0 && <span className="counter">{totalAlerts}</span>}</Button><span className="admin-avatar">HG</span></div>{notifications && <div className="notification-panel" role="dialog" aria-label="Notifications"><h3>Notifications</h3>{pendingOrderCount > 0 && <p>{pendingOrderCount} order{pendingOrderCount > 1 ? 's' : ''} awaiting fulfillment</p>}{pendingReviewCount > 0 && <p>{pendingReviewCount} review{pendingReviewCount > 1 ? 's' : ''} awaiting moderation</p>}{unreadMsgCount > 0 && <p>{unreadMsgCount} unread message{unreadMsgCount > 1 ? 's' : ''}</p>}{out > 0 && <p>{out} product{out > 1 ? 's' : ''} out of stock</p>}{low > 0 && <p>{low} product{low > 1 ? 's' : ''} running low</p>}{totalAlerts === 0 && <p>All stocked up. Looking good.</p>}<Button variant="link" size="sm" onClick={() => { setNotifications(false); navigate({ to: '/admin/inventory' }); }}>View inventory</Button></div>}</header>{menu && <div className="sidebar-scrim" onClick={() => setMenu(false)} aria-hidden="true" />}<main className="admin-content">{children}</main></div></div>;
 }
 function PageHead({ eyebrow, h1, sub, children }: { eyebrow?: string; h1: string; sub?: string; children?: ReactNode }) {
   return <div className="admin-page-title"><div>{eyebrow && <span className="eyebrow">{eyebrow}</span>}<h1>{h1}</h1>{sub && <p>{sub}</p>}</div><div className="admin-actions">{children}</div></div>;

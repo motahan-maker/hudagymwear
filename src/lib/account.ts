@@ -8,6 +8,7 @@
 import { getSupabase, isSupabaseConfigured } from './supabase';
 import { ordersByEmail } from './orders';
 import { allReviews } from './reviews';
+import { broadcastStoreEvent } from './realtime';
 
 export type Address = {
   id: string;
@@ -470,6 +471,7 @@ export async function deleteAccount(email: string): Promise<boolean> {
     try {
       if (localStorage.getItem(SESSION_KEY) === email) localStorage.removeItem(SESSION_KEY);
     } catch { /* ignore */ }
+    broadcastStoreEvent('profiles:changed', { action: 'delete', email });
     return true;
   }
   const me = await getSessionUser();
@@ -487,6 +489,7 @@ export async function deleteAccount(email: string): Promise<boolean> {
   if (targetId === me.id) {
     try { await sb.auth.signOut(); } catch { /* ignore */ }
   }
+  broadcastStoreEvent('profiles:changed', { action: 'delete', email });
   return true;
 }
 
@@ -520,6 +523,7 @@ export async function addCustomerNote(email: string, text: string): Promise<User
     if (!user) return null;
     const updated = { ...user, notes: [...(user.notes ?? []), { at: new Date().toISOString(), text: text.trim() }] };
     persistUser(updated);
+    broadcastStoreEvent('profiles:changed', { action: 'note', email });
     return updated;
   }
   const users = await listUsers();
@@ -527,6 +531,7 @@ export async function addCustomerNote(email: string, text: string): Promise<User
   if (!target) return users.find((u) => u.email === email) ?? null;
   const existing = ((await supaNotes(target)) as CustomerNote[]);
   await sb.from('profiles').update({ notes: [...existing, { at: new Date().toISOString(), text: text.trim() }] }).eq('id', target);
+  broadcastStoreEvent('profiles:changed', { action: 'note', email });
   return users.find((u) => u.email === email) ?? null;
 }
 
@@ -552,11 +557,13 @@ export async function setCustomerTags(email: string, tags: string[]): Promise<Us
     if (!user) return null;
     const updated = { ...user, tags: clean };
     persistUser(updated);
+    broadcastStoreEvent('profiles:changed', { action: 'tags', email });
     return updated;
   }
   const target = await profileIdByEmail(email);
   if (!target) return null;
   await sb.from('profiles').update({ tags: clean }).eq('id', target);
+  broadcastStoreEvent('profiles:changed', { action: 'tags', email });
   return (await listUsers()).find((u) => u.email === email) ?? null;
 }
 

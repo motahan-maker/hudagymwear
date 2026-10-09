@@ -69,3 +69,5 @@ button.admin-store-link{background:none;border:0;border-top:1px solid var(--bord
 .bank-card dd{overflow-wrap:anywhere}
 .checkout-steps li{min-width:0}
 .quantity{flex-wrap:wrap}
+.nav-badge{margin-left:auto;background:var(--burgundy);color:#fff;font-size:9px;font-weight:600;padding:1px 6px;border-radius:10px;line-height:1.4}
+
