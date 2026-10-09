@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { Eye, EyeOff, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { pageHead } from '@/lib/catalog';
-import { updatePassword, logout, isDemoMode } from '@/lib/account';
+import { updatePassword, logout, isDemoMode, authErrorMessage } from '@/lib/account';
 import { getSupabase } from '@/lib/supabase';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 export const Route=createFileRoute('/account/reset')({head:()=>pageHead('Choose a New Password','Set a new password for your HUDA GYMWEAR account.'),component:Reset});
@@ -96,7 +96,8 @@ function Reset(){
     setError('This reset link has expired or was already used. Request a fresh link from sign-in, and open it in the same browser.');
     return;
    }
-  const r=await updatePassword(next);
+  let r:{error?:string};
+  try{r=await updatePassword(next);}catch(err){setBusy(false);setError(authErrorMessage(err));return;}
   if(r.error){
     setBusy(false);
     setError(r.error);
