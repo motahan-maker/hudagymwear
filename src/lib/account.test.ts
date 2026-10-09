@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import { isEmail, register, login, resetPassword, updatePassword, changePassword } from './account';
+import { isEmail, register, login, resetPassword, updatePassword, changePassword, authErrorMessage } from './account';
 
 describe('account authentication logic', () => {
   beforeEach(() => {
@@ -20,6 +20,18 @@ describe('account authentication logic', () => {
       expect(isEmail('user@.com')).toBe(false);
       expect(isEmail('user@domain')).toBe(false);
       expect(isEmail('user @domain.com')).toBe(false);
+    });
+  });
+
+  describe('provider error messages', () => {
+    it('explains that an unverified Resend test sender blocks auth emails', () => {
+      expect(authErrorMessage(new Error('Error sending confirmation email: validation_error')))
+        .toMatch(/verify a sending domain in Resend/i);
+    });
+
+    it('does not expose unknown provider internals', () => {
+      expect(authErrorMessage(new Error('opaque backend detail')))
+        .toMatch(/try again in a moment/i);
     });
   });
 

@@ -48,6 +48,28 @@ export const isDemoMode = () => !isSupabaseConfigured;
 const norm = (email: string) => email.trim().toLowerCase();
 export const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim());
 
+function authRedirect(path: string): string {
+  const configured = import.meta.env['VITE_SITE_URL'] as string | undefined;
+  const origin = window.location.origin;
+  const productionFallback = origin.endsWith('.vercel.app')
+    ? 'https://hudagymwear.vercel.app'
+    : origin;
+  const base = (configured?.trim() || productionFallback).replace(/\/+$/, '');
+  return `${base}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
+/** Convert provider errors into safe, actionable storefront messages. */
+export function authErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  if (/already registered|already exists|duplicate/i.test(message)) return 'An account with this email already exists. Try signing in.';
+  if (/sending|send.*fail|SMTP|mailer|email.*provider|validation_error/i.test(message)) {
+    return 'Email delivery is blocked: verify a sending domain in Resend and configure it as Supabase SMTP. Resend’s test sender can only email its account owner.';
+  }
+  if (/not confirmed|not verified|confirmation/i.test(message)) return 'Please verify your email first — check your inbox for the confirmation link.';
+  if (/rate limit|too many requests|after .* seconds?/i.test(message)) return 'Too many attempts — wait a minute and try again.';
+  return 'We could not complete that request. Please try again in a moment.';
+}
+
 // ---------------------------------------------------------------------------
 // Local demo store (verbatim prototype behaviour, wrapped async)
 // ---------------------------------------------------------------------------
@@ -159,8 +181,9 @@ export function onAuthChange(cb: (u: SessionUser | null) => void): () => void {
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }
-  const { data: { subscription } } = sb.auth.onAuthStateChange(async () => {
-    cb(await getSessionUser());
+  const { data: { subscription } } = sb.auth.onAuthStateChange(() => {
+    // Avoid calling Supabase while its auth lock is held by this callback.
+    window.setTimeout(() => { void getSessionUser().then(cb).catch(() => cb(null)); }, 0);
   });
   return () => subscription.unsubscribe();
 }
@@ -187,13 +210,10 @@ export async function register(input: { name: string; email: string; password: s
   const { data, error } = await sb.auth.signUp({
     email,
     password: input.password,
-    options: { data: { name }, emailRedirectTo: `${window.location.origin}/account` },
+    options: { data: { name }, emailRedirectTo: authRedirect('/account') },
   });
   if (error) {
-    if (/already registered|already exists|duplicate/i.test(error.message)) {
-      return { error: 'An account with this email already exists. Try signing in.' };
-    }
-    return { error: error.message };
+    return { error: authErrorMessage(error) };
   }
   // Supabase returns SUCCESS (no error, no session, no new email) when the
   // address is already registered — the only signal is an empty identities
@@ -239,7 +259,7 @@ export async function signInWithGoogle(): Promise<{ error?: string }> {
   if (!sb) return { error: 'Google sign-in needs Supabase configured.' };
   const { error } = await sb.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: `${window.location.origin}/account`, queryParams: { access_type: 'offline', prompt: 'consent' } },
+    options: { redirectTo: authRedirect('/account'), queryParams: { access_type: 'offline', prompt: 'consent' } },
   });
   if (error) return { error: error.message };
   return {};
@@ -266,9 +286,9 @@ export async function resetPassword(email: string): Promise<{ error?: string }> 
     return {};
   }
   const { error } = await sb.auth.resetPasswordForEmail(norm(email), {
-    redirectTo: `${window.location.origin}/account/reset`,
+    redirectTo: authRedirect('/account/reset'),
   });
-  if (error) return { error: error.message };
+  if (error) return { error: authErrorMessage(error) };
   return {};
 }
 
@@ -295,7 +315,7 @@ export async function resendVerification(email?: string): Promise<{ error?: stri
   const { error } = await sb.auth.resend({
     type: 'signup',
     email: addr,
-    options: { emailRedirectTo: `${window.location.origin}/account` },
+    options: { emailRedirectTo: authRedirect('/account') },
   });
   if (error) {
     // "Error sending confirmation email" = the project's SMTP (e.g. Resend)
@@ -303,13 +323,7 @@ export async function resendVerification(email?: string): Promise<{ error?: stri
     if (/already confirmed|already verified/i.test(error.message)) {
       return { error: 'This email is already verified — please sign in.' };
     }
-    if (/rate limit|too many requests|after .* seconds?/i.test(error.message)) {
-      return { error: 'Too many attempts — wait a minute and try again.' };
-    }
-    if (/sending|send.*fail|SMTP|mailer/i.test(error.message)) {
-      return { error: 'Email service is unavailable right now. Please try again in a few minutes.' };
-    }
-    return { error: error.message };
+    return { error: authErrorMessage(error) };
   }
   return {};
 }

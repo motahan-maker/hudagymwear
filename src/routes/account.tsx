@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { pageHead, money } from '@/lib/catalog';
 import { getSupabase } from '@/lib/supabase';
-import { getSessionUser, register, login, logout, signInWithGoogle, resendVerification, updateProfile, changePassword, resetPassword, saveAddress, deleteAddress, exportUserData, deleteAccount, isDemoMode, onAuthChange, claimGuestOrders, migrateLocalData, type Address, type SessionUser } from '@/lib/account';
+import { getSessionUser, register, login, logout, signInWithGoogle, resendVerification, updateProfile, changePassword, resetPassword, authErrorMessage, saveAddress, deleteAddress, exportUserData, deleteAccount, isDemoMode, onAuthChange, claimGuestOrders, migrateLocalData, type Address, type SessionUser } from '@/lib/account';
 import { UK_PLACES, OTHER_CITY, isListedCity } from '@/lib/uk-places';
 import { ordersByEmail, type Order } from '@/lib/orders';
 import { Breadcrumbs } from '@/components/breadcrumbs';
@@ -68,11 +68,12 @@ function Account(){
    if(r.error){setError(r.error);setPendingVerify('');}
     else if(r.needsVerification){setPendingVerify(email);setNotice(`Account created — we sent a verification link to ${email}. Open it, then sign in.`);setMode('signin');setPassword('');}
    else{setPendingVerify('');setPassword('');await refresh();}
-  }finally{setBusy(false);}
+  }catch(err){setError(authErrorMessage(err));}
+  finally{setBusy(false);}
  }
  async function google(){if(busy)return;setError('');setNotice('');setBusy(true);try{const r=await signInWithGoogle();if(r.error){setError(r.error);setBusy(false);}}catch{setBusy(false);}}
  async function doLogout(){await logout();navigate({to:'/'});}
- async function resend(addr?:string){const r=await resendVerification(addr);if(r.error)toast.error(r.error);else toast.success('Verification email sent — check your inbox.');}
+ async function resend(addr?:string){try{const r=await resendVerification(addr);if(r.error)toast.error(r.error);else toast.success('Verification email sent — check your inbox.');}catch(err){toast.error(authErrorMessage(err));}}
  if(loading)return <div className="page-wrap"><p className="fine-print">Loading your account…</p></div>;
  if(!user)return <><div className="page-wrap"><Breadcrumbs items={[{label:'Home',to:'/'},{label:'Your Account'}]}/></div><div className="page-header"><span className="eyebrow">YOUR WORLD. YOUR HUDA.</span><h1>Your Account</h1><p>A space for your favourites, orders and next chapter.</p></div><div className="account-box"><div className="account-tabs" role="tablist" aria-label="Account access"><Button variant="quiet" className={mode==='signin'?'selected':''} aria-pressed={mode==='signin'} onClick={()=>{setMode('signin');setError('');setNotice('');}}>Sign in</Button><Button variant="quiet" className={mode==='register'?'selected':''} aria-pressed={mode==='register'} onClick={()=>{setMode('register');setError('');setNotice('');}}>Create account</Button></div>
  <form onSubmit={submit}>
