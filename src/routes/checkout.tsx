@@ -89,7 +89,14 @@ function Checkout(){
     if(promoCode&&live&&live.ok)recordDiscountUse(promoCode);
     clearPendingPromo();clearBag();
     navigate({to:'/order-success',search:{order:order.id,email:details.email.trim().toLowerCase()}});
-   }catch(err){setErrors({stock:err instanceof Error?err.message:'Could not place your order. Please try again.'});
+   }catch(err){
+    // Server trigger messages (stock/discount/validation) are written for
+    // shoppers and safe to show; anything else (RLS, SQL internals) stays
+    // generic so no implementation detail ever leaks to the storefront.
+    const msg=err instanceof Error?err.message:'';
+    const friendly=/only \d+ left|not valid|minimum spend|usage limit|no items|invalid order|no longer available|already used/i.test(msg)
+     ?msg:'Could not place your order. Please try again.';
+    setErrors({stock:friendly});
    }finally{setIsPlacing(false);}})();}
 
  if(!bag.length)return <><div className="page-header"><span className="eyebrow">ONE STEP CLOSER TO YOUR NEXT MOVE</span><h1>Checkout</h1></div><div className="empty-state"><h2>Your bag is waiting for you.</h2><Button variant="fashion" asChild><Link to="/shop">SHOP THE COLLECTION</Link></Button></div></>;
