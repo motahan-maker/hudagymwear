@@ -55,3 +55,16 @@ button.admin-store-link{background:none;border:0;border-top:1px solid var(--bord
 @media(max-width:760px){.reviews-summary{grid-template-columns:1fr;padding:20px}.review-admin-body{padding-left:0}.review-card{padding:16px}}
 @media(max-width:760px){.editor-bar{flex-direction:column;align-items:stretch}.preset-grid{gap:6px}.preset-chip{font-size:10px}}
 @media(max-width:760px){.account-layout{grid-template-columns:1fr;padding:0 20px 50px}.account-nav{flex-direction:row;overflow:auto}.account-nav button,.account-nav a{white-space:nowrap}.account-panel{padding:20px}.checkout-steps{font-size:10px;gap:8px 12px;flex-wrap:wrap;justify-content:center;padding:0 8px}.colour-row{grid-template-columns:1fr}.timeline{flex-wrap:wrap}.timeline li{flex:1 1 30%;margin-bottom:12px}.form-grid{grid-template-columns:1fr}.form-grid-3{grid-template-columns:1fr}.stock-matrix{grid-template-columns:repeat(3,1fr)}.checkout-layout{grid-template-columns:1fr}.category-tabs{display:flex;overflow-x:auto;padding-bottom:6px}.footer-top{grid-template-columns:1fr 1fr}.form-field input,.form-field select,.form-field textarea,.promo-form input,.search-form input,.launch-form input{font-size:16px}}
+/* ---- bag + checkout hardening: flex/grid children must shrink, never push ---- */
+.form-field{min-width:0}
+.form-field input,.form-field select,.form-field textarea{width:100%}
+.promo-form input{flex:1;min-width:0}
+.bag-row>div,.summary-row>div{min-width:0}
+.bag-row img,.summary-row img{flex:none}
+/* The product list owns all leftover drawer height and scrolls with momentum;
+   header + totals + CTAs stay pinned (flex:none) so products never get squeezed out. */
+.bag-list{margin-top:25px;flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.bag-sheet>*:not(.bag-list){flex:none}
+.bank-card dd{overflow-wrap:anywhere}
+.checkout-steps li{min-width:0}
+.quantity{flex-wrap:wrap}
