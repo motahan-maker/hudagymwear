@@ -25,6 +25,6 @@ Disallow: /checkout
 Disallow: /order-success
 Disallow: /account/reset
 
-# When your .SHOP domain is connected:
-# Set VITE_SITE_URL=https://your-domain.shop and run: npm run sitemap
-Sitemap: /sitemap.xml
+# Production sitemap — regenerate after domain changes:
+#   SITE_URL=https://YOUR-DOMAIN npm run sitemap
+Sitemap: https://hudagymwear.vercel.app/sitemap.xml

@@ -25,15 +25,26 @@ function Account(){
   let live=true;
   const params=new URLSearchParams(window.location.search);
   const cbError=params.get('error_description')||params.get('error');
+  // Shopify-style clean URLs: drop one-time OAuth params after the exchange
+  // so refresh/bookmark never replays them.
+  function stripAuthParams(){
+   try{
+    const u=new URL(window.location.href);
+    const p=u.searchParams;
+    if(!p.has('code')&&!p.has('error')&&!p.has('error_description')&&!p.has('error_code'))return;
+    for(const k of['code','error','error_description','error_code'])p.delete(k);
+    window.history.replaceState(null,'',`${u.pathname}${p.toString()?`?${p.toString()}`:''}${u.hash}`);
+   }catch{/* ignore */}
+  }
   if(cbError){setError(cbError.replace(/\+/g,' '));setLoading(false);}
   else{
    // OAuth/PKCE callbacks carry ?code=: the session exchange runs async, so
    // hold the loading state until the auth event (or a timeout) resolves it.
    const awaitingCode=params.has('code');
-   getSessionUser().then(u=>{if(live){setUser(u);if(!awaitingCode)setLoading(false);}});
+   getSessionUser().then(u=>{if(live){setUser(u);if(!awaitingCode)setLoading(false);stripAuthParams();}});
    if(awaitingCode)window.setTimeout(()=>{if(live)setLoading(false);},8000);
   }
-  return onAuthChange(u=>{setUser(u);setLoading(false);});
+  return onAuthChange(u=>{setUser(u);setLoading(false);stripAuthParams();});
  },[]);
  useEffect(()=>{if(!user){setMyOrders([]);return;}ordersByEmail(user.email).then(setMyOrders);},[user?.email]);
  // Post-auth sync: claim guest orders + migrate local demo data (covers Google redirect too).
