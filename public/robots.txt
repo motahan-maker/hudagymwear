@@ -1,0 +1,30 @@
+User-agent: Googlebot
+Allow: /
+Disallow: /admin/
+Disallow: /checkout
+Disallow: /order-success
+Disallow: /account/reset
+
+User-agent: Bingbot
+Allow: /
+Disallow: /admin/
+Disallow: /checkout
+Disallow: /order-success
+Disallow: /account/reset
+
+User-agent: Twitterbot
+Allow: /
+
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /checkout
+Disallow: /order-success
+Disallow: /account/reset
+
+# When your .SHOP domain is connected:
+# Set VITE_SITE_URL=https://your-domain.shop and run: npm run sitemap
+Sitemap: /sitemap.xml

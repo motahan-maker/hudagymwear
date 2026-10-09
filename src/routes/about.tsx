@@ -1,0 +1,7 @@
+import { createFileRoute, Link } from '@tanstack/react-router';
+import { ArrowRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { pageHead } from '@/lib/catalog';
+import campaign from '@/assets/campaign.png';
+export const Route=createFileRoute('/about')({head:()=>pageHead('Our Story','HUDA GYMWEAR brings luxury fashion aesthetics to performance activewear. Made for confident women and purposeful movement.'),component:About});
+function About(){return <><section className="about-hero"><img src={campaign} alt="The HUDA GYMWEAR vision" width={1717} height={916} fetchPriority="high"/><div className="hero-content"><span className="eyebrow">THE HUDA STORY</span><h1 className="sr-only">Our Story — HUDA GYMWEAR</h1></div></section><section className="about-copy"><span className="eyebrow">FOR EVERY VERSION OF YOU</span><h2>More than a fit.<br/>A feeling.</h2><p>We believe strength and style belong together. That what you wear should never hold you back — it should remind you of everything you can be.</p><p>HUDA GYMWEAR is a UK women's activewear brand with a simple vision: bring the elegance of luxury fashion to the energy of movement. Considered silhouettes. Confident essentials. A wardrobe that moves with you.</p><p>From your first stretch to your last rep, and every moment in between.<br/>Your strength. Your style.</p><Button variant="fashion" asChild><Link to="/shop">EXPLORE THE COLLECTION <ArrowRight/></Link></Button></section></>}
