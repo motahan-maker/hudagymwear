@@ -1,0 +1,26 @@
+{
+  "name": "HUDA Brand Studio",
+  "short_name": "Brand Studio",
+  "description": "Run HUDA GYMWEAR from your phone: orders, messages, stock and loud new-order alerts.",
+  "id": "/",
+  "start_url": "/admin",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "background_color": "#faf8f4",
+  "theme_color": "#6d1f2c",
+  "lang": "en-GB",
+  "categories": ["business", "productivity", "shopping"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Orders", "short_name": "Orders", "url": "/admin/orders", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Messages", "short_name": "Messages", "url": "/admin/messages", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Inventory", "short_name": "Stock", "url": "/admin/inventory", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

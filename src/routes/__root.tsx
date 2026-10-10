@@ -9,10 +9,11 @@ import {
   Scripts,
   type ErrorComponentProps,
 } from "@tanstack/react-router";
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { StoreProvider, StoreShell } from "@/components/store";
+import { initPwa } from "@/lib/pwa";
 
 function NotFoundComponent() {
   const [q, setQ] = useState("");
@@ -85,9 +86,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { title: "HUDA GYMWEAR | Your strength. Your style." },
       { name: "description", content: "Premium women's activewear. Designed for strength, styled for you." },
+      { name: "theme-color", content: "#6d1f2c" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
+      { name: "apple-mobile-web-app-title", content: "Brand Studio" },
+      { name: "application-name", content: "HUDA Brand Studio" },
+      { name: "format-detection", content: "telephone=no" },
       { property: "og:title", content: "HUDA GYMWEAR" },
       { property: "og:description", content: "Premium women's activewear. Your strength. Your style." },
       { property: "og:type", content: "website" },
@@ -105,6 +113,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: appCss,
       },
       { rel: "icon", href: "/favicon.png", type: "image/png" },
+      { rel: "apple-touch-icon", href: "/icons/apple-touch-icon.png" },
+      { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "mask-icon", href: "/favicon.png", color: "#6d1f2c" },
       { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Cormorant+Garamond:wght@400;500;600&display=swap" },
     ],
   }),
@@ -153,6 +164,21 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    initPwa();
+    // A tapped phone notification tells the worker the link; route to it here.
+    const onSwMessage = (event: MessageEvent) => {
+      const data = event.data as { type?: string; link?: string } | undefined;
+      if (data?.type === 'huda:alert-open' && data.link) {
+        window.dispatchEvent(new CustomEvent('huda:alert-open', { detail: { link: data.link } }));
+        void navigate({ to: data.link as '/admin' });
+      }
+    };
+    navigator.serviceWorker?.addEventListener('message', onSwMessage);
+    return () => navigator.serviceWorker?.removeEventListener('message', onSwMessage);
+  }, [navigate]);
 
   return (
     <QueryClientProvider client={queryClient}>
