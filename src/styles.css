@@ -72,3 +72,179 @@ button.admin-store-link{background:none;border:0;border-top:1px solid var(--bord
 .quantity{flex-wrap:wrap}
 .nav-badge{margin-left:auto;background:var(--burgundy);color:#fff;font-size:9px;font-weight:600;padding:1px 6px;border-radius:10px;line-height:1.4}
 
+/* ================= BRAND STUDIO: responsive shell, PWA chrome, sound alerts =================
+   Everything below is intentionally unlayered so it wins over the Tailwind utilities used by
+   the shared Button / Dialog components, and it is appended last so it also wins over the
+   earlier admin rules (same specificity, later source order). */
+:root{--admin-bar-h:68px;--sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px);--sal:env(safe-area-inset-left,0px);--sar:env(safe-area-inset-right,0px)}
+html{-webkit-text-size-adjust:100%}
+.admin-layout{grid-template-columns:236px 1fr;min-height:100dvh}
+.admin-sidebar{top:0;height:100dvh;padding:calc(16px + var(--sat)) 16px calc(16px + var(--sab));overscroll-behavior:contain}
+.admin-brand{margin-bottom:24px}
+.admin-nav-label{display:block;margin:14px 12px 6px}
+.admin-sidebar nav a{min-height:42px;gap:10px}
+.nav-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.admin-sidebar .nav-badge{flex:none;margin-left:auto}
+.admin-sidebar-foot{margin-top:auto;padding-top:18px}
+.admin-store-link{margin:14px 12px 0;padding-top:16px;font-size:11px}
+button.admin-store-link{margin-top:0;width:calc(100% - 24px);min-height:40px}
+.admin-main{min-width:0}
+.admin-topbar{position:sticky;top:0;z-index:30;height:calc(var(--admin-bar-h) + var(--sat));padding:var(--sat) 24px 0;gap:14px;background:var(--background)}
+.admin-breadcrumb{display:flex;align-items:center;gap:8px;flex:1;min-width:0;font-size:11px;color:var(--muted-foreground)}
+.admin-breadcrumb span{margin:0;min-width:0}
+.crumb-root{flex:none;white-space:nowrap}
+.crumb-sep{flex:none;opacity:.5}
+.crumb-current{font-weight:600;color:var(--foreground);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.admin-top-tools{position:relative;flex:none;display:flex;align-items:center;gap:10px}
+.admin-top-tools .tool-button{position:relative}
+.admin-content{padding:26px 24px calc(48px + var(--sab))}
+.admin-actions.end{justify-content:flex-end;width:100%}
+.metric-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr))}
+.metric>strong{font-size:clamp(20px,2.4vw,27px);overflow-wrap:anywhere}
+.metric span{overflow-wrap:anywhere}
+.table-scroll{-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+.stock-scroll{max-height:74dvh;overscroll-behavior:contain}
+.stock-table th.sticky-col{position:sticky;left:0;z-index:3;background:var(--secondary)}
+.stock-table td.sticky-col{position:sticky;left:0;z-index:2;background:var(--background);box-shadow:1px 0 0 var(--border);max-width:210px}
+.stock-table .admin-product-cell span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* input+button rows must never push past the viewport on narrow phones */
+.url-row{flex-wrap:wrap}
+.url-row input{min-width:0;flex:1 1 140px}
+.url-row>button{flex:0 1 auto;max-width:100%}
+.admin-filter select{min-width:0;flex:1 1 auto}
+.admin-filter>label{min-width:0}
+
+/* --- topbar tools: install, sound, bell --- */
+.install-button.compact{width:38px;height:38px;padding:0;font-size:0;gap:0}
+.install-button{white-space:nowrap}
+.sound-pill{color:var(--muted-foreground)}
+.sound-pill.on{color:var(--burgundy)}
+.sound-pill.on::after{content:"";position:absolute;bottom:5px;left:50%;transform:translateX(-50%);width:14px;height:2px;background:var(--burgundy)}
+.alert-dot{position:absolute;top:5px;right:5px;width:9px;height:9px;border-radius:50%;background:var(--warning);box-shadow:0 0 0 2px var(--background);animation:huda-pulse 1.8s ease-in-out infinite}
+@keyframes huda-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.75)}}
+.install-guide{position:relative;z-index:46;width:min(400px,100%);margin-top:12px;padding:18px;border:1px solid var(--border);background:var(--background);box-shadow:0 20px 50px oklch(.15 0 0 / .14);font-size:11px;text-align:left}
+.admin-top-tools .install-guide{position:absolute;right:0;top:calc(100% + 10px)}
+.install-guide h4{display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:12px}
+.install-guide ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:9px;font-size:11px;line-height:1.5}
+.install-guide p{margin-top:12px}
+.install-guide-close{position:absolute;top:8px;right:8px;width:32px;height:32px;border:0;background:none;cursor:pointer;display:grid;place-items:center;color:var(--muted-foreground)}
+.admin-login{padding:clamp(24px,7vw,40px)}
+.admin-login-install{display:flex;flex-wrap:wrap;justify-content:center;margin-top:26px}
+
+/* --- notification / alerts panel --- */
+.notification-panel{position:absolute;right:16px;top:calc(var(--admin-bar-h) + var(--sat) + 6px);z-index:44;width:min(430px,calc(100vw - 24px));max-height:calc(100dvh - var(--admin-bar-h) - var(--sat) - 24px);overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:18px;text-align:left;border:1px solid var(--border);background:var(--background);box-shadow:0 20px 50px oklch(.15 0 0 / .16)}
+.notification-panel h3{margin:0;font-size:13px}
+.notification-panel p{margin:0;font-size:11px;color:var(--muted-foreground)}
+.alert-panel-head{display:flex;align-items:center;gap:10px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+.alert-panel-head h3{flex:1;display:flex;align-items:center;gap:8px;min-width:0}
+.alert-live{display:inline-flex;align-items:center;gap:5px;flex:none;font-size:8px;font-weight:700;letter-spacing:.1em;padding:4px 9px;border-radius:20px;border:1px solid var(--border);color:var(--muted-foreground)}
+.alert-live.on{color:var(--success);border-color:color-mix(in oklab,var(--success) 45%,var(--border));background:color-mix(in oklab,var(--success) 8%,var(--background))}
+.alert-enable-sound{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:14px;padding:13px;border:1px solid var(--burgundy);background:color-mix(in oklab,var(--burgundy) 8%,var(--background));color:var(--burgundy);font-size:10px;font-weight:700;letter-spacing:.08em;cursor:pointer}
+.alert-snoozed{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px;padding:10px 12px;font-size:10px;color:#8a6d00;background:#fdf6e0;border:1px solid #ead98c}
+.alert-feed{display:flex;flex-direction:column;margin:10px 0 0}
+.alert-item{display:grid;grid-template-columns:30px 1fr auto;gap:10px;align-items:start;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--border);padding:11px 4px;cursor:pointer;color:inherit}
+.alert-item:hover{background:var(--secondary)}
+.alert-item.read{opacity:.5}
+.alert-item-icon{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:color-mix(in oklab,var(--burgundy) 10%,var(--background));color:var(--burgundy)}
+.alert-item-text{min-width:0}
+.alert-item-text strong{display:block;font-size:11px;font-weight:600;line-height:1.35;overflow-wrap:anywhere}
+.alert-item-text small{display:block;font-size:10px;line-height:1.45;color:var(--muted-foreground);margin-top:3px}
+.alert-item-time{font-size:8px;color:var(--muted-foreground);white-space:nowrap;padding-top:4px}
+.alert-feed-actions{display:flex;align-items:center;gap:8px;padding:12px 0 14px;border-bottom:1px solid var(--border)}
+.alert-prefs-title{margin:16px 0 6px;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-foreground)}
+.alert-prefs{display:flex;flex-direction:column;gap:13px}
+.alert-toggle-row{display:flex;align-items:center;gap:12px}
+.alert-toggle-label{flex:1;min-width:0}
+.alert-toggle-label strong{display:block;font-size:11px;font-weight:600}
+.alert-toggle-label small{display:block;font-size:9px;line-height:1.4;color:var(--muted-foreground);margin-top:3px}
+.alert-volume{display:flex;align-items:center;gap:10px}
+.alert-volume>span{flex:none;display:grid;place-items:center;color:var(--muted-foreground)}
+.alert-volume input[type=range]{flex:1;min-width:0;height:26px;accent-color:var(--burgundy)}
+.alert-types{display:flex;flex-wrap:wrap;gap:6px}
+.alert-type{display:inline-flex;align-items:center;gap:6px;font-size:10px;padding:8px 11px;border:1px solid var(--border);background:var(--background);color:inherit;border-radius:20px;cursor:pointer}
+.alert-type.on{border-color:var(--burgundy);color:var(--burgundy);background:color-mix(in oklab,var(--burgundy) 7%,var(--background))}
+.alert-type.off{opacity:.55;text-decoration:line-through}
+.alert-type-count{background:var(--burgundy);color:#fff;font-size:8px;font-weight:700;padding:1px 5px;border-radius:8px;text-decoration:none}
+.alert-snooze{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:10px;color:var(--muted-foreground)}
+.alert-prefs .switch{min-width:50px}
+
+/* --- ringing alert banner --- */
+.alert-hud{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + var(--sab));z-index:80;width:min(660px,calc(100vw - 20px));display:flex;flex-direction:column;gap:12px;padding:14px 16px;background:var(--burgundy);color:#fff;box-shadow:0 16px 44px oklch(.15 0 0 / .32);animation:huda-hud-in .3s ease-out}
+@keyframes huda-hud-in{from{opacity:0;transform:translate(-50%,16px)}to{opacity:1;transform:translate(-50%,0)}}
+.alert-hud-main{display:flex;align-items:flex-start;gap:12px;min-width:0}
+.alert-hud-icon{flex:none;display:grid;place-items:center;width:34px;height:34px;background:oklch(1 0 0 / .16)}
+.alert-hud-text{flex:1;min-width:0}
+.alert-hud-text strong{display:block;font-size:13px;font-weight:600;line-height:1.35;overflow-wrap:anywhere}
+.alert-hud-text p{font-size:11px;line-height:1.45;opacity:.85;margin-top:4px}
+.alert-hud-count{align-self:center;flex:none;font-size:10px;font-weight:700;background:oklch(1 0 0 / .2);padding:3px 8px;border-radius:12px}
+.alert-hud-actions{display:flex;gap:8px;flex-wrap:wrap}
+.alert-hud-actions .fashion-button{flex:1 1 170px;height:42px;padding:0 16px;font-size:11px;background:#fff;color:var(--burgundy);border-color:#fff}
+.alert-hud-actions .quiet-button{flex:1 1 140px;height:42px;padding:0 16px;font-size:11px;background:transparent;color:#fff;border-color:oklch(1 0 0 / .55)}
+.alert-hud-actions .tool-button{width:42px;height:42px;color:#fff;border:1px solid oklch(1 0 0 / .35)}
+
+/* --- tablets / small laptops --- */
+@media(max-width:1100px){.admin-layout{grid-template-columns:212px 1fr}.admin-topbar{padding:var(--sat) 20px 0}.admin-content{padding:24px 20px calc(44px + var(--sab))}}
+@media(max-width:900px){.admin-table .col-date,.admin-table .col-category,.admin-table .col-min{display:none}.notification-panel{right:12px;width:min(420px,calc(100vw - 20px))}}
+
+/* --- phones: drawer sidebar, compact bar, single-column content --- */
+@media(max-width:760px){:root{--admin-bar-h:56px}
+.admin-layout{grid-template-columns:1fr}
+.admin-sidebar{top:calc(var(--admin-bar-h) + var(--sat));height:calc(100dvh - var(--admin-bar-h) - var(--sat) - var(--sab));width:min(280px,86vw);padding:16px 14px calc(16px + var(--sab))}
+.admin-menu{display:inline-flex}
+.admin-topbar{padding:var(--sat) 12px 0;gap:8px}
+.admin-top-tools{gap:6px}
+.admin-avatar{display:none}
+.admin-content{padding:20px 14px calc(56px + var(--sab))}
+.admin-page-title>div:first-child{flex:0 1 auto;min-height:0}
+.crumb-root,.crumb-sep{display:none}
+.metric-grid{grid-template-columns:1fr 1fr;gap:10px}
+.metric{padding:14px}
+.metric>strong{font-size:20px;margin:10px 0}
+.sales-chart{height:170px;background-size:100% 34px}
+.admin-page-title .admin-actions{width:100%}
+.admin-page-title .admin-actions>*{flex:1 1 auto;min-width:0}
+.admin-page-title .admin-actions .fashion-button,.admin-page-title .admin-actions .quiet-button{white-space:normal}
+.review-admin-top{flex-wrap:wrap}
+.stock-table td.sticky-col,.stock-table th.sticky-col{max-width:150px}
+.notification-panel{position:fixed;left:0;right:0;top:calc(var(--admin-bar-h) + var(--sat));width:auto;max-width:none;max-height:calc(100dvh - var(--admin-bar-h) - var(--sat) - 16px);border-left:0;border-right:0;border-top:0;border-radius:0 0 10px 10px;padding:16px 16px calc(20px + var(--sab))}
+.admin-top-tools .install-guide{left:0;right:0;top:calc(var(--admin-bar-h) + var(--sat) + 10px);width:auto;border-radius:0 0 10px 10px;border-left:0;border-right:0}
+.sidebar-scrim{display:block;position:fixed;inset:calc(var(--admin-bar-h) + var(--sat)) 0 0 0;background:var(--overlay);z-index:35}
+.alert-hud{left:10px;right:10px;width:auto;transform:none;bottom:calc(10px + var(--sab));padding:12px 14px}
+@keyframes huda-hud-in{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}}
+
+/* --- small phones: tables become cards --- */
+@media(max-width:640px){.admin-table-orders thead,.admin-table-products thead,.admin-table-discounts thead{display:none}
+.admin-table-orders,.admin-table-orders tbody,.admin-table-products,.admin-table-products tbody,.admin-table-discounts,.admin-table-discounts tbody{display:block;width:100%}
+.admin-table-orders tr,.admin-table-products tr,.admin-table-discounts tr{display:block;width:100%;white-space:normal;border:1px solid var(--border);border-radius:6px;background:var(--background);padding:12px 14px;margin-bottom:12px}
+.admin-table-orders td,.admin-table-products td,.admin-table-discounts td{display:grid;grid-template-columns:92px 1fr;gap:10px;align-items:center;width:100%;border-bottom:0;padding:7px 0;white-space:normal;text-align:left;overflow-wrap:anywhere}
+.admin-table td.col-date,.admin-table td.col-status,.admin-table td.col-category,.admin-table td.col-min{display:grid}
+.admin-table td[data-label]::before{content:attr(data-label);font-size:8px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-foreground)}
+.admin-table-products td.cell-check,.admin-table-products th.cell-check{display:none}
+.admin-table td.cell-action{display:flex;justify-content:flex-end;gap:8px;border-top:1px dashed var(--border);margin-top:8px;padding:10px 0 0}
+.admin-table td.cell-total{font-weight:600}
+.admin-table .admin-product-cell img{height:54px;width:42px}
+.table-scroll:not(.stock-scroll){overflow:visible}
+/* the inventory matrix must stay horizontally scrollable with a sticky product column */
+.stock-scroll{overflow:auto}
+.order-dialog .timeline{flex-wrap:wrap;gap:10px 0}
+.dialog-narrow,.editor-dialog,.order-dialog{left:0;right:0;top:0;transform:none;translate:0 0;width:auto;max-width:none;height:100dvh;max-height:100dvh;min-height:0;border:0;border-radius:0;padding:calc(16px + var(--sat)) calc(16px + var(--sar)) calc(16px + var(--sab)) calc(16px + var(--sal));overflow-y:auto;overscroll-behavior-y:contain}
+.editor-foot{position:sticky;bottom:calc(-1 * var(--sab));margin:20px -16px 0;padding:12px 16px calc(12px + var(--sab));flex-wrap:wrap;gap:8px}
+.editor-foot>*{flex:1 1 auto;min-width:0}
+.colour-row{grid-template-columns:1fr}
+.account-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:100%}
+.account-tabs>*{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stock-input{width:100%;min-width:52px;height:44px;font-size:14px}}
+
+/* --- very narrow (<=380px: Galaxy S8/9, iPhone SE1, foldable covers) --- */
+@media(max-width:400px){.admin-filter{flex-direction:column;align-items:stretch}.admin-filter>label{width:100%}.admin-filter select{width:100%}.admin-page-title h1{font-size:21px}.crumb-current{max-width:44vw}}
+@media(max-width:340px){.metric-grid{grid-template-columns:1fr}.metric>strong{font-size:22px}}
+
+/* --- touch devices: finger-sized hit areas inside admin --- */
+@media(hover:none){.admin-top-tools .tool-button{width:44px;height:44px}.admin-sidebar nav a{min-height:46px}.admin-table .admin-actions button,.admin-table .admin-actions a,.manage-row .admin-actions button,.manage-row .admin-actions a,.cell-action .tool-button{width:38px;height:38px}.admin-table .admin-actions svg,.cell-action svg{width:17px;height:17px}.alert-item{padding:13px 4px}.alert-type{padding:10px 13px}.segmented button{min-height:46px}.install-guide-close{width:40px;height:40px}.media-tools button{width:32px;height:32px}.thumb img{width:76px;height:94px}.preset-chip{padding:11px 13px}.stock-input{height:44px}}
+
+/* --- landscape phones / short viewports: keep dialogs usable --- */
+@media(max-height:520px) and (orientation:landscape){.editor-dialog,.order-dialog,.dialog-narrow{max-height:100dvh}.admin-sidebar{height:100dvh;top:0}.metric-grid{grid-template-columns:repeat(2,1fr)}}
+
+/* --- installed PWA: use the notch area properly, hide browser-chrome assumptions --- */
+@media(display-mode:standalone){.admin-login-wrap{padding:calc(24px + var(--sat)) calc(16px + var(--sar)) calc(24px + var(--sab)) calc(16px + var(--sal))}}
+
