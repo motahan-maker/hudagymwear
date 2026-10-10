@@ -248,3 +248,149 @@ button.admin-store-link{margin-top:0;width:calc(100% - 24px);min-height:40px}
 /* --- installed PWA: use the notch area properly, hide browser-chrome assumptions --- */
 @media(display-mode:standalone){.admin-login-wrap{padding:calc(24px + var(--sat)) calc(16px + var(--sar)) calc(24px + var(--sab)) calc(16px + var(--sal))}}
 
+/* ============================================================
+   STOREFRONT — full customer-journey responsive + spacing pass
+   Appended last on purpose: media queries carry no specificity,
+   so a later plain rule silently beats an earlier @media override.
+   Anything re-declared here wins over the storefront blocks above.
+   ============================================================ */
+
+/* Grid/flex children must be allowed to shrink below their content:
+   an <img width=768> inside a 1fr track otherwise forces the track
+   wider than the page (lookbook overflowed by 23-95px on phones). */
+.editorial-grid>*,.cart-layout>*,.checkout-summary>*,.account-welcome>*{min-width:0}
+/* Two side-by-side CTAs used to hang off both screen edges under 360px. */
+.account-welcome{flex-wrap:wrap;row-gap:12px}
+.account-welcome>*{max-width:100%}
+/* Order confirmation is a centred flex column, so every child sized itself to
+   max-content and the payment card ran past the screen. Cap and stretch them. */
+.empty-state>*{max-width:100%}
+.empty-state>.bank-card{width:100%;max-width:560px}
+/* Order totals on the tracking screen read as a receipt, not loose paragraphs. */
+.order-totals{margin-top:8px}
+.order-totals .bag-total{padding-top:11px;font-size:13px;border-top:1px dashed var(--border)}
+.order-totals .bag-total.grand{border-top:1px solid var(--border);font-size:15px;margin-top:4px}
+
+@media(max-width:760px){
+  /* --- page furniture: headers ate ~40% of a phone viewport --- */
+  .page-header{padding:24px 16px 20px}
+  .page-header h1{font-size:27px;margin:10px 0}
+  .page-header p{font-size:12px;line-height:1.7}
+  .page-header .eyebrow{margin-bottom:10px;font-size:10px}
+  .section{padding:34px 18px}
+  .section-heading{flex-wrap:wrap;gap:10px 16px}
+  .empty-state{gap:18px;min-height:320px;padding:0 18px}
+  .empty-state h2{font-size:20px}
+
+  /* --- CTA rows stack instead of centring into overflow --- */
+  .account-welcome{flex-direction:column;align-items:stretch;gap:12px;width:100%}
+  .account-welcome .fashion-button,.account-welcome .quiet-button{width:100%;justify-content:center;min-height:46px}
+
+  /* --- Track your order: 6-column table cannot fit; use labelled cards --- */
+  /* :not(.stock-scroll) — a bare .table-scroll rule here would silently
+     kill the admin inventory scroller further down the cascade. */
+  .table-scroll:not(.stock-scroll){overflow:visible}
+  .order-table thead{display:none}
+  .order-table,.order-table tbody,.order-table tr,.order-table td{display:block;width:auto}
+  .order-table tr{border:1px solid var(--border);background:var(--background);padding:2px 14px;margin-bottom:12px}
+  .order-table td{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px dashed var(--border);padding:11px 0;text-align:right;font-size:12px}
+  .order-table tr>td:last-child{border-bottom:0}
+  .order-table td::before{content:attr(data-label);font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted-foreground);text-align:left;flex:none}
+  .order-table td.no-label::before{content:none}
+  .order-table td.no-label{justify-content:flex-end;padding-bottom:12px}
+  .account-box{padding:0 16px;margin-bottom:44px}
+  .lookup-form{max-width:none}
+  .lookup-form .form-field{margin-bottom:14px}
+
+  /* --- Track your order: the 5-step strip wrapped 3+2 with orphan
+     connectors, so reuse the vertical stepper geometry here too --- */
+  .timeline{flex-direction:column;flex-wrap:nowrap;gap:14px;margin:16px 0 20px}
+  .timeline li{flex:none;width:auto;min-width:0;margin-bottom:0;text-align:left;padding:0 0 0 26px;font-size:12px;color:var(--muted-foreground)}
+  .timeline li .dot{left:0;top:3px;transform:none}
+  .timeline li::before{left:5px;top:18px;width:2px;height:calc(100% + 10px)}
+  .timeline li:first-child::before{display:block}
+  .timeline li:last-child::before{display:none}
+  .timeline li.done{color:var(--foreground)}
+  .timeline li.current{color:var(--foreground);font-weight:700}
+  .timeline li small{display:inline;font-weight:400;color:var(--burgundy)}
+
+  .preview-note{padding:18px 16px;font-size:12px;line-height:1.75}
+  .preview-note h3{font-size:15px;margin-bottom:4px}
+  .order-items{margin:16px 0;font-size:12px}
+  .order-items p{display:flex;justify-content:space-between;align-items:baseline;gap:14px;padding:9px 0;border-bottom:1px dashed var(--border)}
+  .order-items p span{min-width:0}
+  .order-items p strong{flex:none}
+  .reorder-links{align-items:stretch}
+  .reorder-links .fashion-button{width:100%;justify-content:center;min-height:44px}
+  .reorder-links .text-link{width:100%;justify-content:space-between}
+
+  /* --- Checkout --- */
+  .checkout-layout{padding:0 16px 104px;gap:26px}
+  .checkout-layout h2{font-size:19px;margin-bottom:18px}
+  .checkout-main h2{font-size:20px;margin:4px 0 16px}
+  .checkout-steps{margin-top:12px;gap:8px 14px;font-size:11px}
+  .form-grid{gap:14px}
+  .step-actions{margin-top:22px}
+  /* "PLACE ORDER & SHOW PAYMENT DETAILS" is nowrap by default and stuck out
+     19px past a 320px screen, so the label and arrow were cut off. */
+  .step-actions .fashion-button{min-height:48px;padding:12px 20px;white-space:normal;line-height:1.4;text-align:center;height:auto}
+  .checkout-main button,.checkout-main a,.bank-card button,.bank-card a,.account-welcome button,.account-welcome a,.empty-state button,.empty-state a,.bag-row button,.step-actions button,.step-actions a,.reorder-links button,.reorder-links a{max-width:100%}
+  /* "SEND RECEIPT ON WHATSAPP" is a nowrap anchor and stuck out of the card. */
+  .empty-state .fashion-button,.empty-state .quiet-button,.bank-card .fashion-button,.bank-card .quiet-button{white-space:normal;height:auto;line-height:1.4;text-align:center;padding:12px 16px;justify-content:center}
+  .checkout-summary{padding:20px 16px}
+  .summary-row{font-size:12px}
+  .pay-options{gap:10px}
+  .pay-card{padding:14px;font-size:12px;min-height:56px}
+  .bank-card{padding:16px}
+  .bank-card dl>div{font-size:12px;padding:9px 0}
+  .bank-card dd{word-break:break-word;text-align:right}
+  .promo-form{margin:18px 0}
+  .bag-total{padding-top:18px;font-size:13px}
+  .field-error.big{padding:11px 14px;font-size:12px;margin-bottom:16px}
+  .cart-layout{padding:0 16px 40px;gap:28px}
+  .cart-layout .bag-row{grid-template-columns:84px 1fr;gap:14px}
+  .cart-layout .bag-row img{width:84px;height:112px}
+  .cart-actions{flex-wrap:wrap;gap:8px 14px}
+  .quantity{gap:12px}
+}
+
+@media(max-width:480px){
+  /* Half-width postcode/town fields were unusable on a phone keyboard. */
+  .form-grid{grid-template-columns:1fr;gap:14px}
+  .form-grid .form-field.full{grid-column:auto}
+  /* Primary action first and full width; the spacer column is dead weight. */
+  .step-actions{flex-direction:column-reverse;align-items:stretch;gap:10px}
+  .step-actions>span{display:none}
+  .step-actions .fashion-button,.step-actions .quiet-button{width:100%;justify-content:center}
+  /* Quick view kept two 117px columns on a 320px phone: the size row and
+     the ADD TO BAG label were unreadable. Stack it and restore tap targets. */
+  .quick-dialog{grid-template-columns:1fr;gap:18px;padding:18px 16px;max-height:calc(100dvh - 20px);overflow:auto;align-items:start}
+  .quick-dialog>img{height:210px;max-height:30dvh;max-height:min(210px,30dvh)}
+  .quick-dialog h2{font-size:19px}
+  .quick-dialog .fine-print{margin:6px 0 10px}
+  .quick-dialog .size-options{gap:6px;margin-bottom:16px}
+  .quick-dialog .size-options button{height:44px;font-size:12px}
+  .quick-dialog .fashion-button{font-size:11px;padding:0 18px;min-height:46px}
+  .quick-dialog .text-link{margin-top:16px}
+}
+
+/* Finger-sized size pickers everywhere on the journey (product page too). */
+@media(max-width:760px){.size-options button{height:44px;font-size:12px}}
+
+/* Sticky running total: on phones the summary sat ~600px below the
+   form, so the shopper never saw the price while filling it in. */
+.mobile-total-bar{display:none}
+@media(max-width:760px){
+  .mobile-total-bar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:60;align-items:center;gap:14px;padding:10px 16px calc(10px + var(--sab));background:var(--background);border-top:1px solid var(--border);box-shadow:0 -10px 26px rgba(0,0,0,.09)}
+  .mobile-total-bar>div{flex:1;min-width:0}
+  .mobile-total-bar strong{font-size:15px;display:block}
+  .mobile-total-bar small{display:block;font-size:10px;color:var(--muted-foreground);line-height:1.5}
+}
+
+@media(max-width:340px){
+  .cookie-banner{padding:14px 16px}
+  .cookie-banner>div{flex-wrap:wrap;width:100%;gap:6px}
+  .cookie-banner>div>button{flex:1 1 46%;min-height:40px}
+  .announcement{font-size:8px}
+}
+

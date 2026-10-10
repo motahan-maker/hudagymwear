@@ -1,5 +1,6 @@
 import { getSupabase } from './supabase';
 import { broadcastStoreEvent } from './realtime';
+import { getProduct, effectivePrice } from './catalog';
 
 export type PaymentMethod = 'cod' | 'bank';
 export type PaymentStatus = 'Cash on delivery' | 'Pending proof' | 'Paid';
@@ -115,6 +116,12 @@ function writeAll(orders: Order[]) {
 }
 function seedOrders(): Order[] {
   const at = (d: string) => new Date(d).toISOString();
+  // Demo receipts are only useful if the tracking screen can show real lines,
+  // so each seed is built from the live catalogue and priced to match its total.
+  const line = (id: string, size: string, qty: number): OrderItem[] => {
+    const p = getProduct(id);
+    return p ? [{ productId: p.id, name: p.name, colour: p.colour, size, qty, price: effectivePrice(p), image: p.image }] : [];
+  };
   const mk = (o: Partial<Order> & Pick<Order, 'id' | 'email' | 'customer' | 'total' | 'status'>): Order => ({
     address: { firstName: o.customer.split(' ')[0] ?? 'Guest', lastName: o.customer.split(' ').slice(1).join(' ') || '—', street: '12 Rose Lane', city: 'London', postcode: 'E2 8DP', country: 'United Kingdom', phone: '' },
     items: [], subtotal: o.total, discount: 0, shipping: { method: 'UK standard delivery', price: 0 },
@@ -124,10 +131,10 @@ function seedOrders(): Order[] {
     ...o,
   });
   return [
-    mk({ id: 'HG-1032', email: 'olivia@example.co.uk', customer: 'Olivia Bennett', total: 80, status: 'Packed' }),
-    mk({ id: 'HG-1031', email: 'amelia@example.co.uk', customer: 'Amelia Clarke', total: 113, status: 'Shipped', payment: 'bank' }),
-    mk({ id: 'HG-1030', email: 'isla@example.co.uk', customer: 'Isla Morgan', total: 48, status: 'Delivered' }),
-    mk({ id: 'HG-1029', email: 'sophie@example.co.uk', customer: 'Sophie Taylor', total: 128, status: 'Delivered', payment: 'bank' }),
+    mk({ id: 'HG-1032', email: 'olivia@example.co.uk', customer: 'Olivia Bennett', total: 80, status: 'Packed', items: line('sculpt-matching-set', 'M', 1) }),
+    mk({ id: 'HG-1031', email: 'amelia@example.co.uk', customer: 'Amelia Clarke', total: 113, status: 'Shipped', payment: 'bank', items: [...line('huda-sculpt-zip-hoodie', 'S', 1), ...line('sculpt-seamless-leggings', 'M', 1)] }),
+    mk({ id: 'HG-1030', email: 'isla@example.co.uk', customer: 'Isla Morgan', total: 48, status: 'Delivered', items: line('sculpt-seamless-leggings', 'L', 1) }),
+    mk({ id: 'HG-1029', email: 'sophie@example.co.uk', customer: 'Sophie Taylor', total: 128, status: 'Delivered', payment: 'bank', items: [...line('sculpt-seamless-leggings', 'M', 2), ...line('sculpt-seamless-bra', 'S', 1)] }),
   ];
 }
 
