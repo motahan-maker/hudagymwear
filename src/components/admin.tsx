@@ -442,15 +442,28 @@ export function AdminCategories() {
   const list = useCategories();
   const [name, setName] = useState('');
   const [formError, setFormError] = useState('');
+  const [syncNote, setSyncNote] = useState('');
   const products = useProducts();
 
-  function persist(next: typeof list) {
-    void saveCategories(next);
+  async function persist(next: typeof list, what: string) {
+    setSyncNote('');
+    const r = await saveCategories(next);
+    if (r.ok) {
+      setSyncNote('');
+      toast.success(`${what} — synced across all devices.`);
+    } else {
+      setSyncNote(r.error ?? 'Cloud sync failed.');
+      toast.error(r.error ?? 'Cloud sync failed — retry.');
+    }
   }
   function move(i: number, dir: -1 | 1) {
     const n = [...list]; const j = i + dir; if (j < 0 || j >= n.length) return;
     [n[i], n[j]] = [n[j]!, n[i]!];
-    persist(n.map((c, order) => ({ ...c, order })));
+    void persist(n.map((c, order) => ({ ...c, order })), 'Order updated');
+  }
+  function toggleVisible(cName: string) {
+    const c = list.find(x => x.name === cName);
+    void persist(list.map(x => x.name === cName ? { ...x, visible: !x.visible } : x), c && c.visible ? `${cName} hidden everywhere` : `${cName} visible everywhere`);
   }
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -458,12 +471,11 @@ export function AdminCategories() {
     if (n.length < 2) { setFormError('Type a category name (2+ characters).'); return; }
     if (list.some(c => c.name.toLowerCase() === n.toLowerCase())) { setFormError(`“${n}” already exists — pick another name.`); return; }
     setFormError('');
-    persist([...list, { name: n, visible: false, order: list.length }]);
+    void persist([...list, { name: n, visible: false, order: list.length }], `${n} added (hidden until you SHOW it)`);
     setName('');
-    toast.success(`${n} added — assign products to make it appear.`);
   }
   return <AdminLayout title="Categories"><PageHead h1="Categories" sub="Visibility and order drive the shop tabs and navigation across all devices." />
-    <section className="admin-panel">{list.map((c, i) => <div key={c.name} className="manage-row"><div><strong>{c.name}</strong><small>{products.filter(p => p.category === c.name).length} products · {c.visible ? 'Shown in shop tabs' : 'Hidden'}</small></div><div className="admin-actions"><Button variant="tool" aria-label={`Move ${c.name} up`} disabled={i === 0} onClick={() => move(i, -1)}>↑</Button><Button variant="tool" aria-label={`Move ${c.name} down`} disabled={i === list.length - 1} onClick={() => move(i, 1)}>↓</Button><Button variant={c.visible ? 'quiet' : 'fashion'} size="sm" onClick={() => persist(list.map(x => x.name === c.name ? { ...x, visible: !x.visible } : x))}>{c.visible ? 'HIDE' : 'SHOW'}</Button></div></div>)}
+    <section className="admin-panel">{syncNote && <p className="field-error" role="alert">{syncNote}</p>}{list.map((c, i) => <div key={c.name} className="manage-row"><div><strong>{c.name}</strong><small>{products.filter(p => p.category === c.name).length} products · {c.visible ? 'Shown in shop tabs' : 'Hidden'}</small></div><div className="admin-actions"><Button variant="tool" aria-label={`Move ${c.name} up`} disabled={i === 0} onClick={() => move(i, -1)}>↑</Button><Button variant="tool" aria-label={`Move ${c.name} down`} disabled={i === list.length - 1} onClick={() => move(i, 1)}>↓</Button><Button variant={c.visible ? 'quiet' : 'fashion'} size="sm" onClick={() => toggleVisible(c.name)}>{c.visible ? 'HIDE' : 'SHOW'}</Button></div></div>)}
       <form className="url-row mt-6" onSubmit={submit}><input value={name} onChange={e => { setName(e.target.value); if (formError) setFormError(''); }} placeholder="New category name…" aria-label="New category name" /><Button variant="fashion" type="submit"><Plus size={14} /> ADD CATEGORY</Button></form>{formError && <p className="field-error mt-6" role="alert">{formError}</p>}</section></AdminLayout>;
 }
 

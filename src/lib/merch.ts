@@ -97,7 +97,9 @@ export async function hydrateCategories(): Promise<void> {
   }
 }
 
-export async function saveCategories(list: CategorySetting[]): Promise<void> {
+export type CategoriesSaveResult = { ok: boolean; error?: string };
+
+export async function saveCategories(list: CategorySetting[]): Promise<CategoriesSaveResult> {
   const sorted = [...list].sort((a, b) => a.order - b.order);
   memoryCategories = sorted;
   writeCategories(sorted);
@@ -105,11 +107,16 @@ export async function saveCategories(list: CategorySetting[]): Promise<void> {
   broadcastStoreEvent('categories:changed', { categories: sorted });
 
   const sb = getSupabase();
-  if (!sb) return;
+  if (!sb) return { ok: true };
   try {
-    await sb.from('shop_settings').update({ categories: sorted }).eq('id', 1);
+    const { error } = await sb.from('shop_settings').update({ categories: sorted }).eq('id', 1);
+    if (error) {
+      try { console.error('[categories] cloud sync failed:', error.message); } catch { /* ignore */ }
+      return { ok: false, error: 'Saved on this device only — cloud sync failed. Check your admin sign-in, then retry.' };
+    }
+    return { ok: true };
   } catch {
-    /* ignore — RLS enforces admin */
+    return { ok: false, error: 'Saved on this device only — cloud sync failed. Check your connection, then retry.' };
   }
 }
 
