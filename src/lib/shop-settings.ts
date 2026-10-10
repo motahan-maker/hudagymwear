@@ -127,8 +127,22 @@ export async function hydrateSettings(): Promise<void> {
   } catch { /* ignore — demo mode keeps local data */ }
 }
 
+function cleanSocialUrl(v: string): string {
+  const t = (v ?? '').trim();
+  if (!t) return '';
+  if (/^https?:\/\//i.test(t)) return t;
+  // Any other scheme (javascript:, data:, …) is rejected outright.
+  if (/^[\w-]+:/.test(t)) return '';
+  return `https://${t}`;
+}
+
 export function updateSettings(patch: Partial<ShopSettings>): Promise<ShopSettings> {
   const next = { ...getSettings(), ...patch };
+  // Sanitize social links: footer renders them as anchors, so only http(s)
+  // survives (blocks javascript:/data: schemes; adds https:// if missing).
+  next.instagram = cleanSocialUrl(next.instagram);
+  next.facebook = cleanSocialUrl(next.facebook);
+  next.tiktok = cleanSocialUrl(next.tiktok);
   memorySettings = next;
   try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* ignore */ }
   notifySettingsChanged();

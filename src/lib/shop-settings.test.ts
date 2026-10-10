@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from "vitest";
-import { updateSettings, whatsappLink } from "./shop-settings";
+import { getSettings, updateSettings, whatsappLink } from "./shop-settings";
 
 beforeEach(() => {
   localStorage.clear();
@@ -20,5 +20,21 @@ describe("checkout WhatsApp button logic", () => {
   it("strips non-digits so formatted numbers still work", () => {
     updateSettings({ whatsapp: "  (020) 7946-0018 " });
     expect(whatsappLink("Hi")).toContain("https://wa.me/02079460018?text=");
+  });
+});
+
+describe("social link sanitization (footer renders these as anchors)", () => {
+  it("keeps full https URLs and adds https:// when missing", async () => {
+    await updateSettings({ facebook: "https://www.facebook.com/huda", tiktok: "tiktok.com/@huda" });
+    const s = getSettings();
+    expect(s.facebook).toBe("https://www.facebook.com/huda");
+    expect(s.tiktok).toBe("https://tiktok.com/@huda");
+  });
+
+  it("rejects javascript:/data: schemes so footer links stay safe", async () => {
+    await updateSettings({ facebook: "javascript:alert(1)", instagram: "data:text/html,hi" });
+    const s = getSettings();
+    expect(s.facebook).toBe("");
+    expect(s.instagram).toBe("");
   });
 });
