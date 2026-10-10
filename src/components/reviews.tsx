@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Star, BadgeCheck, ThumbsUp, PenLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { sizes } from '@/lib/catalog';
 import { approvedFor, averageRating, addReview, markHelpful, hasVoted, reviewEligibility, type Review } from '@/lib/reviews';
 
 export function Stars({ value, size = 15 }: { value: number; size?: number }) {
@@ -26,7 +25,6 @@ export function ProductReviews({ productId }: { productId: string }) {
   const [email, setEmail] = useState('');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [size, setSize] = useState('M');
   const [error, setError] = useState('');
   const [sent, setSent] = useState(false);
   useEffect(() => {
@@ -51,7 +49,7 @@ export function ProductReviews({ productId }: { productId: string }) {
     setError('');
     void reviewEligibility(productId, cleanEmail).then((elig) => {
       if (!elig.ok) { setError(elig.reason); return; }
-      return addReview({ productId, author: cleanName, email: cleanEmail, rating, title: title.trim(), body: body.trim(), size, verified: false }).then(() => {
+      return addReview({ productId, author: cleanName, email: cleanEmail, rating, title: title.trim(), body: body.trim(), size: '', verified: false }).then(() => {
         setSent(true); setFormOpen(false); setName(''); setEmail(''); setTitle(''); setBody(''); setRating(5);
         setTick((t) => t + 1);
       }).catch((err: unknown) => setError(err instanceof Error ? err.message : 'Could not submit your review.'));
@@ -61,14 +59,14 @@ export function ProductReviews({ productId }: { productId: string }) {
     {count > 0 ? <div className="reviews-summary"><div className="reviews-avg"><strong>{avg.toFixed(1)}</strong><Stars value={avg} size={18} /><small>Based on {count} review{count === 1 ? '' : 's'}</small></div><div className="reviews-bars">{[5, 4, 3, 2, 1].map((s) => <div key={s} className="reviews-bar-row"><span>{s}★</span><span className="bar"><span style={{ width: `${count ? Math.round((dist[s - 1]! / count) * 100) : 0}%` }} /></span><span>{dist[s - 1]}</span></div>)}</div></div> : <div className="empty-state"><h2>Be the first to review.</h2><p>Your words help her find her fit.</p></div>}
     {count > 0 && <div className="reviews-tools"><select aria-label="Sort reviews" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}><option value="new">Most recent</option><option value="high">Highest rated</option><option value="helpful">Most helpful</option></select><label className="check-line"><input type="checkbox" checked={verifiedOnly} onChange={(e) => setVerifiedOnly(e.target.checked)} /> Verified buyers only</label></div>}
     <div className="reviews-list">{shown.map((r) => <ReviewCard key={r.id} review={r} onVoted={() => setTick((t) => t + 1)} />)}</div>
-    {formOpen && <form className="review-form admin-panel" onSubmit={submit}><h3>Your review</h3><label className="form-field">Name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" maxLength={60} required /></label><label className="form-field">Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" maxLength={120} required /></label><label className="form-field">Rating<StarsInput value={rating} onChange={setRating} /></label><label className="form-field">Headline<input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Sum it up in a line" maxLength={80} /></label><label className="form-field full">Review<textarea value={body} onChange={(e) => setBody(e.target.value)} rows={4} placeholder="Fit, fabric, sizing — what should she know?" maxLength={1000} /></label><label className="form-field">Size purchased<select value={size} onChange={(e) => setSize(e.target.value)}>{sizes.map((s) => <option key={s}>{s}</option>)}</select></label>{error && <p className="field-error" role="alert">{error}</p>}<div className="admin-actions"><Button variant="quiet" type="button" onClick={() => setFormOpen(false)}>CANCEL</Button><Button variant="fashion" type="submit">SUBMIT REVIEW</Button></div></form>}
+    {formOpen && <form className="review-form admin-panel" onSubmit={submit}><h3>Your review</h3><label className="form-field">Name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" maxLength={60} required /></label><label className="form-field">Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" maxLength={120} required /></label><label className="form-field">Rating<StarsInput value={rating} onChange={setRating} /></label><label className="form-field">Headline<input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Sum it up in a line" maxLength={80} /></label><label className="form-field full">Review<textarea value={body} onChange={(e) => setBody(e.target.value)} rows={4} placeholder="Fit, fabric, sizing — what should she know?" maxLength={1000} /></label>{error && <p className="field-error" role="alert">{error}</p>}<div className="admin-actions"><Button variant="quiet" type="button" onClick={() => setFormOpen(false)}>CANCEL</Button><Button variant="fashion" type="submit">SUBMIT REVIEW</Button></div></form>}
     {sent && <p className="field-ok" role="status">Thanks — your review is awaiting moderation and will appear here once approved.</p>}
   </section>;
 }
 
 function ReviewCard({ review: r, onVoted }: { review: Review; onVoted: () => void }) {
   const [voted, setVoted] = useState(hasVoted(r.id));
-  return <article className="review-card"><div className="review-head"><Stars value={r.rating} /><strong>{r.title}</strong></div><p>{r.body}</p><p className="review-meta">{r.author} {r.verified && <span className="verified-tag"><BadgeCheck size={13} /> Verified buyer</span>} · Size {r.size} · {new Date(r.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>{r.adminReply && <div className="brand-reply"><strong>HUDA GYMWEAR responds</strong><p>{r.adminReply}</p></div>}<button type="button" className="helpful-btn" disabled={voted} onClick={() => { void markHelpful(r.id).then((ok) => { if (ok) { setVoted(true); onVoted(); } }); }}><ThumbsUp size={13} /> Helpful ({r.helpful})</button></article>;
+  return <article className="review-card"><div className="review-head"><Stars value={r.rating} /><strong>{r.title}</strong></div><p>{r.body}</p><p className="review-meta">{r.author} {r.verified && <span className="verified-tag"><BadgeCheck size={13} /> Verified buyer</span>}{r.size && <> · Size {r.size}</>} · {new Date(r.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>{r.adminReply && <div className="brand-reply"><strong>HUDA GYMWEAR responds</strong><p>{r.adminReply}</p></div>}<button type="button" className="helpful-btn" disabled={voted} onClick={() => { void markHelpful(r.id).then((ok) => { if (ok) { setVoted(true); onVoted(); } }); }}><ThumbsUp size={13} /> Helpful ({r.helpful})</button></article>;
 }
 
 /** Async rating line for cards and headers (loads approved-review aggregates). */
