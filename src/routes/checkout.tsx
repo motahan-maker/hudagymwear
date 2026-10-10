@@ -92,7 +92,7 @@ function Checkout(){
         if(/failed to fetch|networkerror|load failed|timeout|network request failed/i.test(msg)){
           setErrors({stock:'No connection to the store. Check your internet and try again — your bag is kept.'});
         }else{
-          const friendly=/only \d+ left|not valid|minimum spend|usage limit|no items|invalid order|no longer available|already used/i.test(msg)
+          const friendly=/only \d+ left|not valid|minimum spend|usage limit|no items|invalid order|no longer available|already used|confirmation could not be loaded/i.test(msg)
             ?msg:'Could not place your order. Please try again.';
           setErrors({stock:friendly});
         }

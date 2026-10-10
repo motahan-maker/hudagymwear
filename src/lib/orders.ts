@@ -271,9 +271,21 @@ export async function createOrder(input: Omit<Order, 'id' | 'status' | 'timeline
     status: initial,
     timeline: [{ status: initial, at: new Date().toISOString() }],
   };
-  const { data, error } = await sb.from('orders').insert(row).select('*').single();
-  if (error || !data) throw new Error(error?.message || 'Could not place your order. Please try again.');
-  const placed = toOrder(data as OrderRow);
+  // Insert WITHOUT .select(): PostgREST applies SELECT RLS to RETURNING rows,
+  // and guests can never satisfy orders_owner_read (no JWT email) — coupling
+  // the read-back to the insert turned every successful guest order into an
+  // error. Read back through the path each caller is actually allowed:
+  // owner policy for signed-in users, the SECURITY DEFINER guest RPC otherwise.
+  const { error } = await sb.from('orders').insert(row);
+  if (error) throw new Error(error.message || 'Could not place your order. Please try again.');
+  const placed = input.userId
+    ? await getOrder(id)
+    : await getGuestOrder(id, input.email);
+  if (!placed) {
+    throw new Error(
+      'Your order may have been received but the confirmation could not be loaded. Please check Your Orders before trying again.'
+    );
+  }
   broadcastStoreEvent('orders:changed', { action: 'create', id: placed.id });
   return placed;
 }
