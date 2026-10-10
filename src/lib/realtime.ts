@@ -12,7 +12,20 @@ export type StoreEventType =
   | 'messages:changed'
   | 'profiles:changed';
 
-type Listener = () => void;
+/** Extra context carried with every event so listeners can tell *what*
+ *  actually happened (a brand new order vs. a status change on an old one),
+ *  and whether this device caused it. Used by the admin alert engine. */
+export type StoreEventDetail = {
+  action?: 'create' | 'update' | 'delete' | 'read' | 'submit' | 'status' | 'reply' | 'upsert' | string | undefined;
+  id?: string | undefined;
+  /** 'local' = caused by this device/tab, 'remote' = another device's broadcast,
+   *  'db' = Supabase postgres_changes replication (could be either). */
+  source?: 'local' | 'remote' | 'db' | undefined;
+  /** Free-form payload that the originating device attached. */
+  data?: Record<string, unknown> | undefined;
+};
+
+type Listener = (detail?: StoreEventDetail) => void;
 const listeners = new Map<StoreEventType, Set<Listener>>();
 
 export function subscribeToStoreEvent(event: StoreEventType, listener: Listener): () => void {
@@ -26,12 +39,13 @@ export function subscribeToStoreEvent(event: StoreEventType, listener: Listener)
   };
 }
 
-export function notifyStoreEvent(event: StoreEventType): void {
+export function notifyStoreEvent(event: StoreEventType, detail?: StoreEventDetail): void {
   const set = listeners.get(event);
   if (set) {
-    set.forEach((fn) => {
+    // Copy first: a listener may unsubscribe while we iterate.
+    [...set].forEach((fn) => {
       try {
-        fn();
+        fn(detail);
       } catch (err) {
         console.error(`Error in listener for ${event}:`, err);
       }
@@ -41,6 +55,24 @@ export function notifyStoreEvent(event: StoreEventType): void {
 
 let activeChannel: RealtimeChannel | null = null;
 let initialized = false;
+
+/** Best-effort id extraction from a postgres_changes record. */
+function recordId(record: unknown): string | undefined {
+  if (record && typeof record === 'object' && 'id' in record) {
+    const v = (record as { id?: unknown }).id;
+    if (typeof v === 'string') return v;
+  }
+  return undefined;
+}
+
+/** Map a Supabase postgres event name onto our action vocabulary. */
+function dbAction(eventType: string): string {
+  if (eventType === 'INSERT') return 'create';
+  if (eventType === 'DELETE') return 'delete';
+  return 'update';
+}
+
+type TableHandlers = { sync?: () => void | Promise<void>; events: StoreEventType[] };
 
 export function initRealtime(handlers?: {
   onProductsSync?: () => Promise<void> | void;
@@ -60,76 +92,44 @@ export function initRealtime(handlers?: {
   try {
     const channel = sb.channel('huda-realtime-channel');
 
-    // 1. Listen for Supabase Postgres table changes
-    channel
-      .on(
+    const onTable = (table: string, events: StoreEventType[], sync?: () => void) => {
+      channel.on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'products' },
-        () => {
-          handlers?.onProductsSync?.();
-          notifyStoreEvent('products:changed');
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'shop_settings' },
-        () => {
-          handlers?.onSettingsSync?.();
-          handlers?.onCategoriesSync?.();
-          notifyStoreEvent('settings:changed');
-          notifyStoreEvent('categories:changed');
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'discounts' },
-        () => {
-          handlers?.onDiscountsSync?.();
-          notifyStoreEvent('discounts:changed');
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'orders' },
-        () => {
-          handlers?.onOrdersSync?.();
-          notifyStoreEvent('orders:changed');
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'reviews' },
-        () => {
-          handlers?.onReviewsSync?.();
-          notifyStoreEvent('reviews:changed');
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'messages' },
-        () => {
-          handlers?.onMessagesSync?.();
-          notifyStoreEvent('messages:changed');
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'profiles' },
-        () => {
-          handlers?.onProfilesSync?.();
-          notifyStoreEvent('profiles:changed');
+        { event: '*', schema: 'public', table },
+        (payload: { eventType?: string; record?: unknown }) => {
+          sync?.();
+          const detail: StoreEventDetail = {
+            action: dbAction(payload?.eventType ?? 'UPDATE'),
+            id: recordId(payload?.record),
+            source: 'db',
+          };
+          for (const ev of events) notifyStoreEvent(ev, detail);
         }
       );
+    };
+
+    // 1. Listen for Supabase Postgres table changes
+    onTable('products', ['products:changed'], handlers?.onProductsSync);
+    onTable('shop_settings', ['settings:changed', 'categories:changed'], () => {
+      void handlers?.onSettingsSync?.();
+      void handlers?.onCategoriesSync?.();
+    });
+    onTable('discounts', ['discounts:changed'], handlers?.onDiscountsSync);
+    onTable('orders', ['orders:changed'], handlers?.onOrdersSync);
+    onTable('reviews', ['reviews:changed'], handlers?.onReviewsSync);
+    onTable('messages', ['messages:changed'], handlers?.onMessagesSync);
+    onTable('profiles', ['profiles:changed'], handlers?.onProfilesSync);
 
     // 2. Listen for Instant Multi-Device Broadcast Events (<50ms delivery)
-    channel.on('broadcast', { event: 'store_broadcast' }, (payload: { payload?: { type?: StoreEventType } }) => {
-      const type = payload?.payload?.type;
+    channel.on('broadcast', { event: 'store_broadcast' }, (payload: { payload?: { type?: StoreEventType; action?: string; id?: string; data?: Record<string, unknown> } }) => {
+      const body = payload?.payload;
+      const type = body?.type;
       if (!type) return;
 
       if (type === 'products:changed') handlers?.onProductsSync?.();
       if (type === 'categories:changed' || type === 'settings:changed') {
-        handlers?.onSettingsSync?.();
-        handlers?.onCategoriesSync?.();
+        void handlers?.onSettingsSync?.();
+        void handlers?.onCategoriesSync?.();
       }
       if (type === 'discounts:changed') handlers?.onDiscountsSync?.();
       if (type === 'orders:changed') handlers?.onOrdersSync?.();
@@ -137,7 +137,7 @@ export function initRealtime(handlers?: {
       if (type === 'messages:changed') handlers?.onMessagesSync?.();
       if (type === 'profiles:changed') handlers?.onProfilesSync?.();
 
-      notifyStoreEvent(type);
+      notifyStoreEvent(type, { action: body?.action, id: body?.id, source: 'remote', data: body?.data });
     });
 
     channel.subscribe((status) => {
@@ -161,8 +161,23 @@ export function initRealtime(handlers?: {
 }
 
 export function broadcastStoreEvent(event: StoreEventType, data?: unknown): void {
-  // Always notify local listeners first
-  notifyStoreEvent(event);
+  const action =
+    data && typeof data === 'object' && 'action' in data
+      ? String((data as { action?: unknown }).action)
+      : undefined;
+  const id =
+    data && typeof data === 'object' && 'id' in data
+      ? String((data as { id?: unknown }).id)
+      : undefined;
+
+  // Always notify local listeners first — flagged as locally-caused so the
+  // alert engine can stay silent for actions this device just performed.
+  notifyStoreEvent(event, {
+    action,
+    id,
+    source: 'local',
+    data: data && typeof data === 'object' ? (data as Record<string, unknown>) : undefined,
+  });
 
   // Broadcast to other open tabs and devices via Supabase channel
   if (activeChannel && isSupabaseConfigured) {
@@ -170,10 +185,16 @@ export function broadcastStoreEvent(event: StoreEventType, data?: unknown): void
       void activeChannel.send({
         type: 'broadcast',
         event: 'store_broadcast',
-        payload: { type: event, data, timestamp: Date.now() },
+        payload: { type: event, action, id, data, timestamp: Date.now() },
       });
     } catch {
       /* ignore send failure */
     }
   }
+}
+
+/** True once the realtime channel is up — used by the alert engine to show a
+ *  "live / offline" indicator to staff. */
+export function isRealtimeLive(): boolean {
+  return initialized && activeChannel !== null;
 }
