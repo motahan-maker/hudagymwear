@@ -5,7 +5,7 @@ import { ProductCard } from '@/components/store';
 import { pageHead, useActiveProducts } from '@/lib/catalog';
 import { homepageFavourites, formCards, useVisibleCategories } from '@/lib/merch';
 import heroImg from '@/assets/hero.png';
-import campaign from '@/assets/campaign.png';
+import campaign from '@/assets/campaign-photo.jpg';
 
 export const Route=createFileRoute('/')({head:()=>pageHead('Premium Women’s Activewear','Luxury-inspired activewear for every version of you. Discover leggings, sports bras and matching sets from HUDA GYMWEAR.',{path:'/'}),component:Index});
 
