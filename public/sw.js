@@ -7,7 +7,7 @@
  *     never cached — realtime/data must never come from a cache.
  */
 
-const VERSION = 'huda-bs-v1';
+const VERSION = 'huda-bs-v2';
 const STATIC_CACHE = `${VERSION}-static`;
 const NAV_CACHE = `${VERSION}-nav`;
 const PRECACHE = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/maskable-512.png', '/icons/apple-touch-icon.png', '/favicon.png'];
@@ -32,7 +32,83 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('message', (event) => {
   if (event.data === 'SKIP_WAITING') self.skipWaiting();
+  // The page can hand an alert to the worker instead of constructing a
+  // Notification itself: worker-shown notifications survive the tab being
+  // hidden or closed and support `renotify` on the same tag.
+  if (event.data && event.data.type === 'huda:notify') {
+    event.waitUntil(showAlert(event.data.alert || {}));
+  }
+  // Snapshot of the unread feed, kept so a scheduled wake-up can still tell the
+  // owner "3 orders are still waiting" after the app has been shut for a day.
+  if (event.data && event.data.type === 'huda:cache-alerts') {
+    event.waitUntil((async () => {
+      const cache = await caches.open(`${VERSION}-alerts`);
+      await cache.put('latest', new Response(JSON.stringify(event.data.snapshot || {})));
+    })());
+  }
 });
+
+const ICON = '/icons/icon-192.png';
+const URGENT = { order: true, proof: true, stock: true };
+const VIBRATE = {
+  order: [240, 130, 240, 130, 480],
+  proof: [200, 100, 200, 100, 320],
+  stock: [320, 130, 320],
+  message: [120, 60, 120],
+  review: [90],
+};
+
+function showAlert(a) {
+  const type = a.type || 'order';
+  return self.registration.showNotification(`HUDA · ${a.title || 'New activity'}`, {
+    body: a.body || '',
+    tag: a.id || `huda-${type}-${Date.now()}`,
+    icon: ICON,
+    badge: ICON,
+    data: { link: a.link || '/admin' },
+    // A push that arrives while the app is closed has no Web Audio to lean on,
+    // so the notification itself carries the noise and the vibration pattern.
+    silent: false,
+    requireInteraction: Boolean(URGENT[type]),
+    renotify: true,
+    vibrate: VIBRATE[type] || [120, 60, 120],
+  });
+}
+
+// Web Push: the sender is the Supabase Edge Function wired up in
+// supabase/PUSH_SETUP.md. The payload is already decrypted by the browser by
+// the time this handler runs, so orders reach the phone with the app closed.
+self.addEventListener('push', (event) => {
+  let alert = {};
+  try { alert = event.data ? event.data.json() : {}; } catch { alert = { title: 'New activity', body: event.data ? event.data.text() : '' }; }
+  event.waitUntil(showAlert(alert));
+});
+
+// Backstop for devices where push is not configured: Chrome may still wake the
+// worker on schedule, and we re-announce whatever is still unhandled.
+self.addEventListener('periodicsync', (event) => {
+  if (event.tag !== 'huda-order-check') return;
+  event.waitUntil((async () => {
+    const cache = await caches.open(`${VERSION}-alerts`);
+    const hit = await cache.match('latest');
+    if (!hit) return;
+    let snap;
+    try { snap = await hit.json(); } catch { return; }
+    if (!snap || !snap.unread) return;
+    // Only nag about things that have been sitting unhandled for a while, never
+    // an alert the ringer is still playing.
+    const age = Date.now() - new Date(snap.at || 0).getTime();
+    if (age < 20 * 60_000) return;
+    await showAlert({
+      type: 'order',
+      id: 'huda-still-waiting',
+      title: `${snap.unread} alert${snap.unread === 1 ? '' : 's'} still waiting`,
+      body: snap.summary || 'Open Brand Studio to silence them.',
+      link: '/admin/orders',
+    });
+  })());
+});
+
 
 function isStaticAsset(url) {
   return url.origin === self.location.origin && STATIC_RE.test(url.pathname);

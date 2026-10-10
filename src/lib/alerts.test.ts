@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
-  clearAlerts, getAlerts, getPrefs, isSnoozed, pushAlert, ringingAlerts,
+  clearAlerts, getAlerts, getPrefs, isSnoozed, melodyLength, notificationBody,
+  pushAlert, pushConfigured, pushStatus, ringingAlerts,
   setPrefs, silenceAlarms, snoozeMinutes, startAdminAlerts, unreadAlerts,
+  type AlertItem,
 } from './alerts';
 import { notifyStoreEvent } from './realtime';
 import { products, sizes, type Product } from './catalog';
@@ -164,5 +166,40 @@ describe('watchers', () => {
 
     if (original) p.stockBySize = original;
     else delete p.stockBySize;
+  });
+});
+
+describe('alarm shape', () => {
+  it('gives the urgent alerts a long, distinguishable melody', () => {
+    // The old pips were ~0.5s and staff missed them in a pocket. Order, receipt
+    // and stock alarms must run long enough to be heard and be different lengths
+    // from each other so the tune alone identifies the type.
+    expect(melodyLength('order')).toBeGreaterThanOrEqual(2.5);
+    expect(melodyLength('proof')).toBeGreaterThanOrEqual(2);
+    expect(melodyLength('stock')).toBeGreaterThanOrEqual(2);
+    const lengths = (['order', 'proof', 'message', 'review', 'stock'] as const).map((t) => melodyLength(t));
+    expect(new Set(lengths).size).toBe(5);
+  });
+
+  it('keeps the phone notification silent while Web Audio owns the sound', () => {
+    const a: AlertItem = { id: 'x1', type: 'order', title: 'New order HG-1', body: '£40', at: new Date().toISOString(), read: false, link: '/admin/orders' };
+    const { title, opts } = notificationBody(a);
+    expect(title).toBe('HUDA · New order HG-1');
+    expect(opts.silent).toBe(true);
+    expect(opts.requireInteraction).toBe(true);
+    expect(opts.tag).toBe('x1');
+    expect((opts.data as { link: string }).link).toBe('/admin/orders');
+    expect(notificationBody({ ...a, type: 'review' }).opts.requireInteraction).toBe(false);
+  });
+
+  it('stores the closed-app preference and reports push as unavailable without a VAPID key', async () => {
+    setPrefs({ alertsWhenClosed: false });
+    expect(getPrefs().alertsWhenClosed).toBe(false);
+    setPrefs({ alertsWhenClosed: true });
+    expect(getPrefs().alertsWhenClosed).toBe(true);
+    expect(pushConfigured()).toBe(false); // no VITE_VAPID_PUBLIC_KEY in tests
+    // jsdom has no PushManager, so the honest answer is "this device cannot push";
+    // either way it must never report an active subscription.
+    expect(['unsupported', 'not-configured']).toContain(await pushStatus());
   });
 });

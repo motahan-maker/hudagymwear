@@ -9,7 +9,8 @@ import {
   getAlerts, subscribeAlerts, getPrefs, subscribePrefs, setPrefs, previewSound,
   silenceAlarms, clearAlerts, snoozeMinutes, isSnoozed, ringingAlerts, subscribeRingers,
   requestNotifications, notificationState, isAudioReady, unlockAudio,
-  ALERT_LABEL, type AlertType, type AlertItem, type AdminLink,
+  pushStatus, enablePush, pushConfigured, keepAliveActive, melodyLength,
+  ALERT_LABEL, type AlertType, type AlertItem, type AdminLink, type PushState,
 } from '@/lib/alerts';
 import { isRealtimeLive, subscribeToStoreEvent } from '@/lib/realtime';
 
@@ -108,6 +109,14 @@ export function NotificationsPanel({ onClose }: { onClose: () => void }) {
   const [audio, setAudio] = useState(isAudioReady());
   const [snoozed, setSnoozed] = useState(isSnoozed());
   const [permission, setPermission] = useState(notificationState());
+  const [push, setPush] = useState<PushState>('unsubscribed');
+  const [awake, setAwake] = useState(keepAliveActive());
+
+  useEffect(() => {
+    void pushStatus().then(setPush);
+    const t = setInterval(() => setAwake(keepAliveActive()), 5000);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     const tick = () => { setLive(isRealtimeLive()); setAudio(isAudioReady()); setSnoozed(isSnoozed()); };
@@ -174,7 +183,7 @@ export function NotificationsPanel({ onClose }: { onClose: () => void }) {
         <Toggle
           on={prefs.sound}
           label="Alert sound"
-          hint={audio ? 'Ready' : 'Silent until you tap once (browser rule)'}
+          hint={audio ? `Ready — new orders ring for ${melodyLength('order').toFixed(1)}s` : 'Silent until you tap once (browser rule)'}
           onChange={(v) => { setPrefs({ sound: v }); if (v) { unlockAudio(); previewSound('order'); } }}
         />
         <div className="alert-volume">
@@ -198,10 +207,41 @@ export function NotificationsPanel({ onClose }: { onClose: () => void }) {
           label="Phone notifications"
           hint={permission === 'granted' ? 'Allowed — works when installed as an app' : permission === 'unsupported' ? 'Not supported in this browser' : permission === 'denied' ? 'Blocked in browser settings' : 'Allow once to get lock-screen alerts'}
           onChange={(v) => {
-            if (v) void requestNotifications().then((r) => { setPermission(r); setPrefs({ systemNotifications: r === 'granted' }); });
+            if (v) void requestNotifications().then(async (r) => {
+              setPermission(r);
+              setPrefs({ systemNotifications: r === 'granted' });
+              if (r === 'granted' && pushConfigured()) setPush(await enablePush());
+            });
             else setPrefs({ systemNotifications: false });
           }}
         />
+        <Toggle
+          on={prefs.alertsWhenClosed}
+          label="Alerts when the app is closed"
+          hint={
+            push === 'subscribed' ? 'Phone push is live — orders reach you even after you shut the app.'
+              : push === 'denied' ? 'Turn notifications on above first.'
+                : push === 'unsupported' ? 'This browser cannot receive background alerts.'
+                  : awake ? 'Keeping this device listening while Brand Studio runs in the background.'
+                    : 'Rings while the app is in your pocket / background. Enable sound for it to hold the line open.'
+          }
+          onChange={(v) => {
+            setPrefs({ alertsWhenClosed: v });
+            if (v && pushConfigured() && notificationState() === 'granted') void enablePush().then(setPush);
+          }}
+        />
+        {prefs.alertsWhenClosed && pushConfigured() && push !== 'subscribed' && (
+          <Button variant="quiet" size="sm" className="w-full" onClick={() => { void enablePush().then(setPush); }}>
+            <Wifi size={13} /> ACTIVATE PHONE PUSH
+          </Button>
+        )}
+        {prefs.alertsWhenClosed && !pushConfigured() && (
+          <p className="fine-print">
+            Alerts keep coming while Brand Studio is open in the background. To be woken by the
+            phone after the app is fully closed, phone push has to be switched on once in Supabase
+            (VAPID key + the order webhook) — see supabase/PUSH_SETUP.md.
+          </p>
+        )}
         <div className="alert-types">
           {(Object.keys(ALERT_LABEL) as AlertType[]).map((t) => {
             const Icon = ICON[t];
