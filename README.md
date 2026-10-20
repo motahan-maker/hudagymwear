@@ -19,6 +19,31 @@ and a Printify print-on-demand fulfilment integration.
 | Tests | Vitest 4 + Testing Library (109 tests) |
 | Deploy | Vercel (Nitro `node-server` output in `.output/`) |
 
+## Deployment
+
+`vercel.json` pins the build to the Nitro output:
+
+```json
+{ "framework": "nitro", "buildCommand": "npm run build", "outputDirectory": ".output" }
+```
+
+`nitro` is a **runtime** dependency rather than a dev dependency so the platform
+detects the framework from `package.json` instead of guessing. The build
+output is self-contained — `.output/server/index.mjs` serves the app and
+`.output/public` the static assets.
+
+The build refuses to run if a privileged credential would reach a browser:
+
+- a `VITE_`-prefixed secret is rejected outright, because that prefix
+  guarantees the value is inlined into the public bundle;
+- the *value* of any server-side secret that happens to be in the build
+  environment is scanned for in every emitted chunk, so a leak is caught
+  whatever the variable was called.
+
+A server-side secret merely being present in the build environment is normal
+and is not an error — platforms expose project variables to the build. Only an
+actual leak fails the build.
+
 ## Commands
 
 ```sh
