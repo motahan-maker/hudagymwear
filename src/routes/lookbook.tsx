@@ -1,11 +1,11 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { pageHead, activeProducts, productImage } from '@/lib/catalog';
+import { pageHead, useActiveProducts, productImage } from '@/lib/catalog';
 import { Button } from '@/components/ui/button';
 import black from '@/assets/black-set.jpg';
 import burgundy from '@/assets/burgundy-hoodie.jpg';
 export const Route=createFileRoute('/lookbook')({head:()=>pageHead('The Lookbook','The HUDA GYMWEAR edit. Discover sculpting essentials, elevated layers and confident complete looks.'),component:Lookbook});
 function Lookbook(){
- const live=activeProducts();
+ const live=useActiveProducts();
  const setItems=live.filter(p=>p.category==='Matching Sets');
  const hoodieItems=live.filter(p=>p.category==='Hoodies');
  const hero1=setItems[0];const hero2=hoodieItems[0];

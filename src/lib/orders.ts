@@ -17,16 +17,6 @@ export type OrderStatus =
 export const PIPELINE: OrderStatus[] = ['Received', 'Packed', 'Shipped', 'Out for delivery', 'Delivered'];
 // Legal moves: forward only, cancel anytime before delivery.
 // Bank orders leave 'Awaiting payment proof' exclusively via approvePayment.
-export const NEXT_STATUSES: Record<OrderStatus, OrderStatus[]> = {
-  'Awaiting payment proof': ['Cancelled'],
-  'Order received': ['Received', 'Cancelled'],
-  Received: ['Packed', 'Cancelled'],
-  Packed: ['Shipped', 'Cancelled'],
-  Shipped: ['Out for delivery', 'Cancelled'],
-  'Out for delivery': ['Delivered', 'Cancelled'],
-  Delivered: [],
-  Cancelled: [],
-};
 // Next steps derived from the furthest pipeline point in the order's HISTORY,
 // not just its current status — so non-linear histories (e.g. back to
 // 'Order received' after 'Received') still offer the correct next step.
@@ -166,24 +156,6 @@ export async function listOrders(): Promise<Order[]> {
   if (error) return [];
   return ((data ?? []) as OrderRow[]).map(toOrder);
 }
-export async function ordersByEmail(email: string): Promise<Order[]> {
-  const e = email.trim().toLowerCase();
-  const sb = getSupabase();
-  if (!sb) return readAll().filter((o) => o.email === e).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const { data: { session } } = await sb.auth.getSession();
-  let q = sb.from('orders').select('*');
-  q = session ? q.or(`user_id.eq.${session.user.id},guest_email.eq.${e}`) : q.eq('guest_email', e);
-  const { data, error } = await q.order('created_at', { ascending: false });
-  if (error) return [];
-  return ((data ?? []) as OrderRow[]).map(toOrder);
-}
-export async function ordersByUser(userId: string): Promise<Order[]> {
-  const sb = getSupabase();
-  if (!sb) return [];
-  const { data, error } = await sb.from('orders').select('*').eq('user_id', userId).order('created_at', { ascending: false });
-  if (error) return [];
-  return ((data ?? []) as OrderRow[]).map(toOrder);
-}
 export async function getOrder(id: string): Promise<Order | undefined> {
   const sb = getSupabase();
   if (!sb) return readAll().find((o) => o.id === id);
@@ -191,6 +163,35 @@ export async function getOrder(id: string): Promise<Order | undefined> {
   if (error || !data) return undefined;
   return toOrder(data as OrderRow);
 }
+/**
+ * The last order placed on this device.
+ *
+ * The confirmation page is reached with the order number in the query string.
+ * A reload, a shared link or a stripped parameter would otherwise lose it, and
+ * the shopper would be told their order could not be found even though it was
+ * placed. Remembering the id locally means the confirmation can still be
+ * resolved, and "we cannot find it" stays a statement of fact.
+ */
+const LAST_ORDER_KEY = 'huda.lastOrder.v1';
+export function rememberOrder(id: string, email: string): void {
+  try {
+    localStorage.setItem(LAST_ORDER_KEY, JSON.stringify({ id, email }));
+  } catch {
+    /* ignore */
+  }
+}
+export function lastOrder(): { id: string; email: string } | null {
+  try {
+    const raw = localStorage.getItem(LAST_ORDER_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { id?: string; email?: string };
+    if (!parsed?.id) return null;
+    return { id: parsed.id, email: parsed.email ?? '' };
+  } catch {
+    return null;
+  }
+}
+
 /** Guest lookup via the `get_guest_order` RPC (id + email verified server-side). */
 export async function getGuestOrder(id: string, email: string): Promise<Order | undefined> {
   const cleanId = id.trim().toUpperCase();
@@ -285,6 +286,9 @@ export async function createOrder(input: Omit<Order, 'id' | 'status' | 'timeline
   // owner policy for signed-in users, the SECURITY DEFINER guest RPC otherwise.
   const { error } = await sb.from('orders').insert(row);
   if (error) throw new Error(error.message || 'Could not place your order. Please try again.');
+  // Remember the order on the device so a reload of the confirmation page
+  // still finds it, even if the query string is lost.
+  rememberOrder(id, row.guest_email);
   const placed = input.userId
     ? await getOrder(id)
     : await getGuestOrder(id, input.email);

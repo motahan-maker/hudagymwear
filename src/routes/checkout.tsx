@@ -2,10 +2,10 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, ArrowLeft, Check, Banknote, Landmark, MessageCircle } from 'lucide-react';
 import { useStore } from '@/components/store';
-import { money, getProduct, sizeStock, upsertProduct, pageHead, effectivePrice, useProducts, type Product } from '@/lib/catalog';
+import { money, getProduct, sizeStock, adjustLocalStock, pageHead, effectivePrice, useProducts, type Product } from '@/lib/catalog';
 import { createOrder, type PaymentMethod } from '@/lib/orders';
 import { validateDiscount, recordDiscountUse, getPendingPromo, clearPendingPromo } from '@/lib/discounts';
-import { useSettings, whatsappLink, DEFAULT_SHIPPING } from '@/lib/shop-settings';
+import { useSettings, whatsappLink, DEFAULT_SHIPPING, DEFAULT_FREE_OVER } from '@/lib/shop-settings';
 import { UK_PLACES, OTHER_CITY, isListedCity, isUkPostcode } from '@/lib/uk-places';
 import { Button } from '@/components/ui/button';
 
@@ -20,7 +20,7 @@ function Checkout(){
   const shopSettings=useSettings();
   const allProducts=useProducts();
   const SHIP_METHODS=shopSettings.shipping?.length?shopSettings.shipping:DEFAULT_SHIPPING;
-  const FREE_OVER=shopSettings.freeOver>0?shopSettings.freeOver:100;
+  const FREE_OVER=shopSettings.freeOver>0?shopSettings.freeOver:DEFAULT_FREE_OVER;
   const [step,setStep]=useState(0);
   const [details,setDetails]=useState<Details>(()=>({ ...emptyDetails }));
   const [citySel,setCitySel]=useState('');const [cityCustom,setCityCustom]=useState('');
@@ -31,7 +31,7 @@ function Checkout(){
   const [code,setCode]=useState(()=>getPendingPromo()??'');const [promoCode,setPromoCode]=useState<string|null>(()=>getPendingPromo());const [codeMsg,setCodeMsg]=useState('');const [isPlacing,setIsPlacing]=useState(false);
   const [errors,setErrors]=useState<FieldErrors>({});
 
-  const lines=useMemo(()=>bag.map(i=>({item:i,p:allProducts.find(p=>p.id===i.id)||getProduct(i.id)})).filter(x=>x.p) as {item:{id:string;size:string;quantity:number};p:Product}[],[bag, allProducts]);
+  const lines=useMemo(()=>bag.map(i=>({item:i,p:allProducts.find(p=>p.id===i.id)||getProduct(i.id)})).filter(x=>x.p) as {item:{id:string;size:string;colour?:string;quantity:number};p:Product}[],[bag, allProducts]);
   const subtotal=lines.reduce((n,{item,p})=>n+effectivePrice(p)*item.quantity,0);
   const shipOption=SHIP_METHODS.find(s=>s.id===ship&&s.enabled)??SHIP_METHODS.find(s=>s.enabled)??DEFAULT_SHIPPING[0]!;
   const freeShip=shipOption.id==='standard'&&subtotal-(promoCode?validateDiscount(promoCode,subtotal).amount:0)>=FREE_OVER;
@@ -67,18 +67,18 @@ function Checkout(){
         const order=await createOrder({
           email:details.email.trim().toLowerCase(),customer:`${details.firstName.trim()} ${details.lastName.trim()}`.trim()||details.email,
           address:{firstName:details.firstName,lastName:details.lastName,street:details.street,city:details.city,postcode:details.postcode,country:details.country,phone:details.phone},
-          items:lines.map(({item,p})=>({productId:p.id,name:p.name,colour:p.colour,size:item.size,qty:item.quantity,price:effectivePrice(p),image:p.image})),
+          items:lines.map(({item,p})=>({productId:p.id,name:p.name,colour:item.colour||p.colour,size:item.size,qty:item.quantity,price:effectivePrice(p),image:p.image})),
           subtotal,discount:finalDiscount,total:finalTotal,payment:pay,
           shipping:{method:shipOption?.label??ship,price:shipPrice},
           ...(promoCode&&live&&live.ok?{discountCode:promoCode}:{}),
           ...(pay==='bank'&&ref.trim()?{transferRef:ref.trim()}:{}),
         });
-        for(const {item,p} of lines){
-          const next={...p};
-          if(next.stockBySize)next.stockBySize={...next.stockBySize,[item.size]:Math.max(0,(next.stockBySize[item.size]??0)-item.quantity)};
-          else if(next.stock!=null)next.stock=Math.max(0,next.stock-item.quantity);
-          void upsertProduct(next);
-        }
+        // Stock belongs to the database: the `recalculate_order` trigger
+        // decremented it atomically as part of pricing this order. The browser
+        // only adjusts its own copy so the shopper sees the new figure at once;
+        // it must not write the product row back, or it would overwrite the
+        // server's decrement with a pre-order snapshot.
+        for(const {item,p} of lines)adjustLocalStock(p.id,item.size,item.quantity);
         if(promoCode&&live&&live.ok)recordDiscountUse(promoCode);
         clearPendingPromo();clearBag();
         navigate({to:'/order-success',search:{order:order.id,email:details.email.trim().toLowerCase()}});

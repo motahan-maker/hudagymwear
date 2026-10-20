@@ -1,8 +1,14 @@
 node_modules
 dist
+dist-ssr
 .output
 .vinxi
+.tanstack
 pnpm-lock.yaml
 package-lock.json
 bun.lock
 routeTree.gen.ts
+# Supabase Edge Functions are Deno code: formatted with `deno fmt`, not Prettier.
+supabase/functions
+# The service worker is hand-written and deliberately compact.
+public/sw.js

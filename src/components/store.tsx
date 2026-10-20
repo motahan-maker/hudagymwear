@@ -4,7 +4,7 @@ import { Search, Heart, ShoppingBag, Menu, ArrowRight, Minus, Plus, Truck, Refre
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { products, money, getProduct, sizeStock, productColours, effectivePrice, isSoldOut, hydrateCatalog, useProducts, type Product } from '@/lib/catalog';
-import { getSettings, hydrateSettings, whatsappLink, useSettings } from '@/lib/shop-settings';
+import { hydrateSettings, whatsappLink, useSettings } from '@/lib/shop-settings';
 import { getConsent, setConsent } from '@/lib/consent';
 import { submitMessage, hydrateMessages } from '@/lib/messages';
 import { clearLegacyCollections, hydrateCategories, useHeaderNav, useSidebarNav } from '@/lib/merch';
@@ -16,20 +16,35 @@ import { Toaster, toast } from 'sonner';
 import { QuickView } from '@/components/quick-view';
 import { MiniStars } from '@/components/reviews';
 import { loadWishlist, persistWishlist } from '@/lib/account';
+import { lineColour, lineKey, type BagItem } from '@/lib/bag';
 
-type BagItem = {id:string;size:string;quantity:number};
-type StoreState = {bag:BagItem[];wishlist:string[];toggleWish:(id:string)=>void;add:(id:string,size:string)=>void;change:(id:string,size:string,delta:number)=>void;clearBag:()=>void;openBag:()=>void};
+/**
+ * A bag line is a product in a size AND a colour. The colour is optional only
+ * so that bags saved before colours were tracked still load; such a line means
+ * "the product's default colour" and is resolved through `lineColour`.
+ */
+/**
+ * The bag model lives in @/lib/bag so it can be shared with the cart, the
+ * checkout and the tests without turning this component file into a module
+ * with mixed exports.
+ */
+type StoreState = {bag:BagItem[];wishlist:string[];toggleWish:(id:string)=>void;add:(id:string,size:string,colour?:string)=>void;change:(id:string,size:string,colour:string,delta:number)=>void;clearBag:()=>void;openBag:()=>void};
 const StoreContext=createContext<StoreState | null>(null);
 export function useStore(){const value=useContext(StoreContext);if(!value)throw new Error('Store provider missing');return value;}
 function loadStored<T>(key:string,fallback:T):T{try{const raw=localStorage.getItem(key);if(raw)return JSON.parse(raw) as T;}catch{/* ignore */}return fallback;}
 
+/** The bag lives in this browser. One key, one owner. */
+const BAG_KEY = 'huda.bag.v1';
+
 export function StoreProvider({children}:{children:ReactNode}){
-  const [bag,setBag]=useState<BagItem[]>(()=>loadStored<BagItem[]>('huda.bag.v1',[]));
-  const [wishlist,setWishlist]=useState<string[]>(()=>loadStored<string[]>('huda.wishlist.v1',[]));
+  const [bag,setBag]=useState<BagItem[]>(()=>loadStored<BagItem[]>(BAG_KEY,[]));
+  // The wishlist is loaded by the effect below from @/lib/account, which owns
+  // the key. Reading it here as well would be a second owner of the same key.
+  const [wishlist,setWishlist]=useState<string[]>([]);
   const [bagOpen,setBagOpen]=useState(false);
   const liveProducts = useProducts();
 
-  useEffect(()=>{try{localStorage.setItem('huda.bag.v1',JSON.stringify(bag));}catch{/* ignore */}},[bag]);
+  useEffect(()=>{try{localStorage.setItem(BAG_KEY,JSON.stringify(bag));}catch{/* ignore */}},[bag]);
   
   // Hydrate all stores and initialize Realtime channel
   useEffect(()=>{
@@ -57,11 +72,33 @@ export function StoreProvider({children}:{children:ReactNode}){
   useEffect(()=>{let live=true;loadWishlist().then(ids=>{if(live)setWishlist(ids);});return ()=>{live=false;};},[]);
   useEffect(()=>{persistWishlist(wishlist);},[wishlist]);
 
-  const add=(id:string,size:string)=>{const p=liveProducts.find(x=>x.id===id)||getProduct(id);const inBag=bag.filter(i=>i.id===id&&i.size===size).reduce((n,i)=>n+i.quantity,0);if(p&&sizeStock(p,size)<=inBag){toast.error('Sorry — this size just sold out.');return;}setBag(prev=>{const found=prev.find(i=>i.id===id&&i.size===size);return found?prev.map(i=>i===found?{...i,quantity:i.quantity+1}:i):[...prev,{id,size,quantity:1}];});setBagOpen(true);};
-  const change=(id:string,size:string,delta:number)=>setBag(prev=>{const p=liveProducts.find(x=>x.id===id)||getProduct(id);const cap=p?sizeStock(p,size):Infinity;return prev.map(i=>{if(i.id!==id||i.size!==size)return i;const next=i.quantity+delta;if(next<=0)return null;if(next>cap){toast.error('No more left in this size.');return i;}return {...i,quantity:next};}).filter((i):i is BagItem=>i!==null);});
+  const add=(id:string,size:string,colour?:string)=>{
+    const p=liveProducts.find(x=>x.id===id)||getProduct(id);
+    const target=colour||p?.colour||'';
+    const inBag=bag.filter(i=>i.id===id&&i.size===size&&lineColour(i,p)===target).reduce((n,i)=>n+i.quantity,0);
+    if(p&&sizeStock(p,size)<=inBag){toast.error('Sorry — this size just sold out.');return;}
+    setBag(prev=>{
+      const found=prev.find(i=>i.id===id&&i.size===size&&lineColour(i,p)===target);
+      return found
+        ?prev.map(i=>i===found?{...i,quantity:i.quantity+1}:i)
+        :[...prev,{id,size,colour:target,quantity:1}];
+    });
+    setBagOpen(true);
+  };
+  const change=(id:string,size:string,colour:string,delta:number)=>setBag(prev=>{
+    const p=liveProducts.find(x=>x.id===id)||getProduct(id);
+    const cap=p?sizeStock(p,size):Infinity;
+    return prev.map(i=>{
+      if(i.id!==id||i.size!==size||lineColour(i,p)!==colour)return i;
+      const next=i.quantity+delta;
+      if(next<=0)return null;
+      if(next>cap){toast.error('No more left in this size.');return i;}
+      return {...i,quantity:next};
+    }).filter((i):i is BagItem=>i!==null);
+  });
   const clearBag=()=>setBag([]);
 
-  return <StoreContext.Provider value={{bag,wishlist,toggleWish:id=>setWishlist(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]),add,change,clearBag,openBag:()=>setBagOpen(true)}}>{children}<Sheet open={bagOpen} onOpenChange={setBagOpen}><SheetContent className="bag-sheet"><SheetTitle>Your bag ({bag.reduce((n,i)=>n+i.quantity,0)})</SheetTitle><SheetDescription>A little strength. A lot of style.</SheetDescription>{bag.length===0?<div className="empty-state"><ShoppingBag size={40}/><h2>Something good is missing.</h2><p>Your next favourite fit is waiting.</p><Button variant="fashion" asChild onClick={()=>setBagOpen(false)}><Link to="/shop">Explore the collection <ArrowRight/></Link></Button></div>:<><div className="bag-list">{bag.map(item=>{const p=liveProducts.find(p=>p.id===item.id)||products.find(p=>p.id===item.id);if(!p)return null;return <div className="bag-row" key={item.id+item.size}><img src={p.image} alt={p.name} width={96} height={144} loading="lazy" decoding="async"/><div><h3>{p.name}</h3><p>{p.colour} / {item.size}</p><strong>{p.salePrice?<><del>{money(p.price)} </del>{money(p.salePrice)}</>:money(p.price)}</strong><div className="quantity"><Button variant="tool" aria-label={`Decrease ${p.name}`} onClick={()=>change(item.id,item.size,-1)}><Minus/></Button><span>{item.quantity}</span><Button variant="tool" aria-label={`Increase ${p.name}`} disabled={item.quantity>=sizeStock(p,item.size)} title={item.quantity>=sizeStock(p,item.size)?'No more left in this size':`Increase ${p.name}`} onClick={()=>change(item.id,item.size,1)}><Plus/></Button></div></div></div>})}</div><div className="bag-total"><span>Subtotal</span><strong>{money(bag.reduce((n,i)=>{const p=liveProducts.find(x=>x.id===i.id)||getProduct(i.id);return n+(p?effectivePrice(p):0)*i.quantity;},0))}</strong></div><p className="fine-print">Delivery calculated at checkout.</p><Button variant="fashion" className="w-full" asChild onClick={()=>setBagOpen(false)}><Link to="/checkout">Continue to checkout <ArrowRight/></Link></Button><Button variant="link" asChild onClick={()=>setBagOpen(false)}><Link to="/cart">VIEW & EDIT BAG</Link></Button><p className="fine-print">Guaranteed safe &amp; secure checkout</p></>}</SheetContent></Sheet><Toaster position="bottom-center"/></StoreContext.Provider>;
+  return <StoreContext.Provider value={{bag,wishlist,toggleWish:id=>setWishlist(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]),add,change,clearBag,openBag:()=>setBagOpen(true)}}>{children}<Sheet open={bagOpen} onOpenChange={setBagOpen}><SheetContent className="bag-sheet"><SheetTitle>Your bag ({bag.reduce((n,i)=>n+i.quantity,0)})</SheetTitle><SheetDescription>A little strength. A lot of style.</SheetDescription>{bag.length===0?<div className="empty-state"><ShoppingBag size={40}/><h2>Something good is missing.</h2><p>Your next favourite fit is waiting.</p><Button variant="fashion" asChild onClick={()=>setBagOpen(false)}><Link to="/shop">Explore the collection <ArrowRight/></Link></Button></div>:<><div className="bag-list">{bag.map(item=>{const p=liveProducts.find(p=>p.id===item.id)||products.find(p=>p.id===item.id);if(!p)return null;return <div className="bag-row" key={lineKey(item.id,item.size,lineColour(item,p))}><img src={p.image} alt={p.name} width={96} height={144} loading="lazy" decoding="async"/><div><h3>{p.name}</h3><p>{lineColour(item,p)} / {item.size}</p><strong>{p.salePrice?<><del>{money(p.price)} </del>{money(p.salePrice)}</>:money(p.price)}</strong><div className="quantity"><Button variant="tool" aria-label={`Decrease ${p.name}`} onClick={()=>change(item.id,item.size,lineColour(item,p),-1)}><Minus/></Button><span>{item.quantity}</span><Button variant="tool" aria-label={`Increase ${p.name}`} disabled={item.quantity>=sizeStock(p,item.size)} title={item.quantity>=sizeStock(p,item.size)?'No more left in this size':`Increase ${p.name}`} onClick={()=>change(item.id,item.size,lineColour(item,p),1)}><Plus/></Button></div></div></div>})}</div><div className="bag-total"><span>Subtotal</span><strong>{money(bag.reduce((n,i)=>{const p=liveProducts.find(x=>x.id===i.id)||getProduct(i.id);return n+(p?effectivePrice(p):0)*i.quantity;},0))}</strong></div><p className="fine-print">Delivery calculated at checkout.</p><Button variant="fashion" className="w-full" asChild onClick={()=>setBagOpen(false)}><Link to="/checkout">Continue to checkout <ArrowRight/></Link></Button><Button variant="link" asChild onClick={()=>setBagOpen(false)}><Link to="/cart">VIEW & EDIT BAG</Link></Button><p className="fine-print">Guaranteed safe &amp; secure checkout</p></>}</SheetContent></Sheet><Toaster position="bottom-center"/></StoreContext.Provider>;
 }
 
 export function StoreShell({children}:{children:ReactNode}){

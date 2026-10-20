@@ -21,6 +21,9 @@ export type ShopSettings = {
 };
 
 const KEY = 'huda.settings.v1';
+/** Free standard-delivery threshold in GBP. One owner, so the checkout fallback and the default cannot drift. */
+export const DEFAULT_FREE_OVER = 100;
+
 export const DEFAULT_SHIPPING: ShippingMethod[] = [
   { id: 'standard', label: 'UK standard delivery', hint: '2–4 working days', price: 3.95, enabled: true },
   { id: 'express', label: 'UK express delivery', hint: 'Next working day', price: 6.95, enabled: true },
@@ -36,7 +39,7 @@ const defaults: ShopSettings = {
   accountNumber: '',
   iban: '',
   shipping: DEFAULT_SHIPPING,
-  freeOver: 100,
+  freeOver: DEFAULT_FREE_OVER,
   lowStockAt: 5,
 };
 

@@ -1,22 +1,22 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from '@tanstack/react-router';
-import { LayoutDashboard, Package, ShoppingBag, BarChart3, Settings, ArrowUpRight, ArrowLeft, Search, Bell, Plus, Pencil, Trash2, Menu, LogOut, Check, Boxes, Tags, BadgePercent, Lock, ImagePlus, X, Copy, Star, Mail, Eye, EyeOff } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingBag, BarChart3, Settings, ArrowUpRight, Search, Bell, Plus, Pencil, Trash2, Menu, LogOut, Check, Boxes, Tags, BadgePercent, Lock, ImagePlus, X, Copy, Star, Mail, Eye, EyeOff, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { products, money, upsertProduct, deleteProduct, totalStock, sizeStock, slugify, tones, badges, sizes, productImage, productColours, getProduct, COLOUR_PRESETS, guessTone, presetFor, effectivePrice, useProducts, type Product, type ProductColour, type ProductStatus } from '@/lib/catalog';
+import { products, money, upsertProduct, deleteProduct, totalStock, sizeStock, adjustLocalStock, slugify, badges, sizes, productImage, productColours, getProduct, COLOUR_PRESETS, guessTone, presetFor, effectivePrice, useProducts, type Product, type ProductColour, type ProductStatus } from '@/lib/catalog';
 import { listOrders, getOrder, setOrderStatus, approvePayment, cancelOrder, createOrder, PIPELINE, nextStatuses, PAYMENT_LABEL, type Order, type OrderStatus } from '@/lib/orders';
-import { allReviews, setReviewStatus, replyReview, deleteReview, type Review, type ReviewStatus } from '@/lib/reviews';
+import { allReviews, setReviewStatus, replyReview, deleteReview, type Review } from '@/lib/reviews';
 import { Stars } from '@/components/reviews';
 import { downloadCSV } from '@/lib/csv';
 import { listMessages, markMessageRead, deleteMessage, unreadMessages } from '@/lib/messages';
-import { listDiscounts, saveDiscount, deleteDiscount, useDiscounts, type Discount } from '@/lib/discounts';
-import { listCategories, saveCategories, useCategories } from '@/lib/merch';
+import { saveDiscount, deleteDiscount, useDiscounts, type Discount } from '@/lib/discounts';
+import { saveCategories, useCategories } from '@/lib/merch';
 import { uploadProductImage, fileToWebPDataUrl, deleteProductImage, isStorageReady, TRANSFER_BUCKET } from '@/lib/product-images';
-import { getSupabase } from '@/lib/supabase';
+import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 import { login, logout, isAdminUser, isDemoMode, onAuthChange } from '@/lib/account';
-import { isSupabaseConfigured } from '@/lib/supabase';
 import { getSettings, updateSettings, useSettings, DEFAULT_SHIPPING } from '@/lib/shop-settings';
 import { subscribeToStoreEvent } from '@/lib/realtime';
+import { useBestSellers, useDailyRevenue, useLowStock, useOrderMetrics, useOrders, useRevenueByCategory } from '@/lib/admin-metrics';
 import { startAdminAlerts, subscribeAlerts, unreadAlerts, type AdminLink } from '@/lib/alerts';
 import { NotificationsPanel, AlertHud, SoundPill } from '@/components/admin-alerts';
 import { InstallButton } from '@/components/pwa';
@@ -25,14 +25,24 @@ import { toast } from 'sonner';
 // Brand logo served locally from public/ (no external asset hosting).
 const logo = { url: '/favicon.png' };
 
-// --- admin auth (demo gate) ---------------------------------------------------
-const ADMIN_EMAIL = (import.meta.env['VITE_ADMIN_EMAIL'] as string | undefined) || (import.meta.env.DEV ? 'admin@huda-gymwear.co.uk' : '');
-const ADMIN_PASS = (import.meta.env['VITE_ADMIN_PASS'] as string | undefined) || (import.meta.env.DEV ? 'huda2026' : '');
+// --- admin auth ---------------------------------------------------------------
+// There is no admin credential in this file, and none may be added. Production
+// access is Supabase Auth plus profiles.role = 'admin' (src/lib/account.ts), and
+// Postgres RLS is the independent enforcement layer behind it.
+//
+// The only unauthenticated path is a LOCAL DEMO escape hatch for a dev machine
+// with no Supabase project configured. It is compiled out of production builds
+// (import.meta.env.DEV is false there) and the guard in vite.config.ts fails any
+// build that would ship a credential in a client bundle.
 const ADMIN_KEY = 'huda.admin.v1';
-export function isAdmin(): boolean {
+/** True only in a local dev build with no Supabase project configured. */
+function isLocalDemo(): boolean {
+  return import.meta.env.DEV && isDemoMode();
+}
+function isAdmin(): boolean {
   try { return sessionStorage.getItem(ADMIN_KEY) === '1'; } catch { return false; }
 }
-export function adminLogout() {
+function adminLogout() {
   try { sessionStorage.removeItem(ADMIN_KEY); } catch { /* ignore */ }
 }
 export function AdminGuard({ children }: { children: ReactNode }) {
@@ -71,11 +81,17 @@ export function AdminLogin({ onDone }: { onDone?: () => void }) {
       });
       return;
     }
-    if (email.trim().toLowerCase() === ADMIN_EMAIL && ADMIN_EMAIL !== '' && password === ADMIN_PASS) {
+    if (isLocalDemo()) {
+      // Local demo only: with no Supabase project there is nothing to
+      // authenticate against, and no credential ships in this bundle. The
+      // production branch above is the only one that checks a password.
       try { sessionStorage.setItem(ADMIN_KEY, '1'); } catch { /* ignore */ }
       toast.success('Welcome back to Brand Studio.');
       if (onDone) onDone(); else navigate({ to: '/admin' });
-    } else { setError('Incorrect admin email or password.'); setBusy(false); }
+      return;
+    }
+    setError('Admin access is not configured on this store.');
+    setBusy(false);
   }
   return (
     <div className="admin-login-wrap">
@@ -86,7 +102,7 @@ export function AdminLogin({ onDone }: { onDone?: () => void }) {
         <form onSubmit={submit}>
           <label className="form-field">
             Work email
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={ADMIN_EMAIL || 'admin@hudagymwear.com'} autoComplete="username" required />
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@hudagymwear.co.uk" autoComplete="username" required />
           </label>
           <div className="form-field">
             <label htmlFor="admin-pass">Password</label>
@@ -117,14 +133,10 @@ export function AdminLogin({ onDone }: { onDone?: () => void }) {
             <Lock size={14} /> {busy ? 'SIGNING IN…' : 'SIGN IN'}
           </Button>
         </form>
-        {isDemoMode() ? (
-          import.meta.env.DEV ? (
-            <p className="fine-print">Demo access — email: {ADMIN_EMAIL} · password: {ADMIN_PASS}</p>
-          ) : (
-            <p className="fine-print">Admin access is not configured on this store.</p>
-          )
+        {isLocalDemo() ? (
+          <p className="fine-print">Local demo mode — no Supabase project is configured, so this form opens the dashboard without signing in. This branch is compiled out of production builds.</p>
         ) : (
-          <p className="fine-print">Production security: Access granted via Supabase Auth with verified <code>role = 'admin'</code>.</p>
+          <p className="fine-print">Admin access is granted through Supabase Auth to accounts with <code>role = 'admin'</code>.</p>
         )}
         <Link to="/" className="text-link">← Back to storefront</Link>
         <div className="admin-login-install"><InstallButton /></div>
@@ -152,6 +164,7 @@ const nav = [
   { label: 'Reviews', to: '/admin/reviews', icon: Star },
   { label: 'Messages', to: '/admin/messages', icon: Mail },
   { label: 'Analytics', to: '/admin/analytics', icon: BarChart3 },
+  { label: 'Printify', to: '/admin/printify', icon: Printer },
   { label: 'Settings', to: '/admin/settings', icon: Settings },
 ] as const;
 
@@ -244,32 +257,15 @@ function money0(n: number) { return money(Math.round(n * 100) / 100); }
 
 // --- overview -------------------------------------------------------------------
 export function AdminOverview() {
-  const [orders, setOrders] = useState<Order[]>([]);
+  const { orders, reload } = useOrders();
   const liveProducts = useProducts();
-  const reload = () => { listOrders().then(setOrders); };
-  useEffect(() => {
-    listOrders().then(setOrders);
-    const off = subscribeToStoreEvent('orders:changed', reload);
-    return off;
-  }, []);
-  const live = orders.filter(o => o.status !== 'Cancelled');
-  const revenue = live.reduce((n, o) => n + o.total, 0);
-  const aov = live.length ? revenue / live.length : 0;
-  const active = liveProducts.filter(p => (p.status ?? 'Active') === 'Active').length;
-  const days = [...Array(14)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - (13 - i)); return d.toISOString().slice(0, 10); });
-  const byDay = days.map(d => live.filter(o => o.createdAt.slice(0, 10) === d).reduce((n, o) => n + o.total, 0));
-  const max = Math.max(1, ...byDay);
-  const cod = live.filter(o => o.payment === 'cod').length;
-  const bank = live.filter(o => o.payment === 'bank').length;
-  const sold = new Map<string, { name: string; qty: number; rev: number; image: string }>();
-  for (const o of live) for (const it of o.items) {
-    const s = sold.get(it.productId) ?? { name: it.name, qty: 0, rev: 0, image: it.image };
-    s.qty += it.qty; s.rev += it.qty * it.price; sold.set(it.productId, s);
-  }
-  const top = [...sold.values()].sort((a, b) => b.rev - a.rev).slice(0, 4);
-  const lowStock = liveProducts.filter(p => totalStock(p) <= lowAt());
+  const { live, revenue, averageOrderValue, orderCount, codCount, bankCount } = useOrderMetrics(orders);
+  const active = liveProducts.filter((p) => (p.status ?? 'Active') === 'Active').length;
+  const { labels: days, values: byDay, max } = useDailyRevenue(live);
+  const top = useBestSellers(live);
+  const lowStock = useLowStock();
   return <AdminLayout title="Overview"><PageHead eyebrow={new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()} h1="Your brand, at a glance." sub="Live numbers from your store." />
-    <div className="metric-grid">{[['Revenue', money0(revenue), `${live.length} orders`], ['Orders', String(live.length), `${bank} bank · ${cod} COD`], ['Average order value', money0(aov), 'per order'], ['Active products', String(active), `${liveProducts.length - active} in draft`]].map(([label, value, trend]) => <div className="metric" key={label}><span>{label}</span><strong>{value}</strong><small>{trend}</small></div>)}</div>
+    <div className="metric-grid">{[['Revenue', money0(revenue), `${orderCount} orders`], ['Orders', String(orderCount), `${bankCount} bank · ${codCount} COD`], ['Average order value', money0(averageOrderValue), 'per order'], ['Active products', String(active), `${liveProducts.length - active} in draft`]].map(([label, value, trend]) => <div className="metric" key={label}><span>{label}</span><strong>{value}</strong><small>{trend}</small></div>)}</div>
     <div className="admin-chart-layout"><section className="admin-panel"><div className="admin-panel-title"><h2>Sales — last 14 days</h2><span>{money0(revenue)} total</span></div><div className="sales-chart">{byDay.map((v, i) => <div key={i} className="chart-column" title={`${days[i]}: ${money0(v)}`}><div className="chart-fill" style={{ height: `${Math.max(3, (v / max) * 100)}%` }} /></div>)}</div><div className="chart-axis"><span>{days[0]?.slice(5) ?? ''}</span><span>{days[6]?.slice(5) ?? ''}</span><span>{days[13]?.slice(5) ?? ''}</span></div></section>
       <section className="admin-panel"><div className="admin-panel-title"><h2>Best sellers</h2><Link to="/admin/products">View all products →</Link></div>{top.length === 0 ? <p className="fine-print">No item-level sales yet — new checkout orders appear here.</p> : top.map(p => <div className="admin-best" key={p.name}><img src={p.image} alt="" /><div><strong>{p.name}</strong><small>{p.qty} units sold</small></div><span>{money0(p.rev)}</span></div>)}</section></div>
     <section className="admin-panel"><div className="admin-panel-title"><h2>Recent orders</h2><Link to="/admin/orders">View all orders →</Link></div><AdminOrdersTable compact onChange={reload} /></section>
@@ -281,6 +277,10 @@ export function AdminOrdersTable({ compact, onChange }: { compact?: boolean; onC
   const [detail, setDetail] = useState<string | null>(null);
   const [acted, setActed] = useState(false);
   const [receiptBusy, setReceiptBusy] = useState(false);
+  // Held in a ref so the realtime subscription is not torn down and rebuilt
+  // every time the parent re-renders with a new callback.
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
   const [orders, setOrders] = useState<Order[]>([]);
   const [orderDetail, setOrderDetail] = useState<Order | undefined>(undefined);
   const [q, setQ] = useState(''); const [status, setStatus] = useState('all'); const [pay, setPay] = useState('all');
@@ -289,12 +289,12 @@ export function AdminOrdersTable({ compact, onChange }: { compact?: boolean; onC
     const off = subscribeToStoreEvent('orders:changed', () => {
       listOrders().then(setOrders);
       if (detail) getOrder(detail).then((o) => setOrderDetail(o ?? undefined));
-      onChange?.();
+      onChangeRef.current?.();
     });
     return off;
   }, [detail]);
   useEffect(() => { if (!detail) { setOrderDetail(undefined); return; } getOrder(detail).then((o) => setOrderDetail(o ?? undefined)); }, [detail]);
-  const refresh = () => { listOrders().then(setOrders); if (detail) getOrder(detail).then((o) => setOrderDetail(o ?? undefined)); onChange?.(); };
+  const refresh = () => { listOrders().then(setOrders); if (detail) getOrder(detail).then((o) => setOrderDetail(o ?? undefined)); onChangeRef.current?.(); };
   const order = orderDetail;
   const rows = orders.filter(o => (status === 'all' || o.status === status) && (pay === 'all' || o.payment === pay) && (!q || (o.id + o.customer + o.email).toLowerCase().includes(q.toLowerCase())));
   const shown = compact ? rows.slice(0, 5) : rows;
@@ -357,7 +357,6 @@ export function ProductEditor({ initial, onSaved, onClose }: { initial: Product 
   const [colours, setColours] = useState<ProductColour[]>(initial?.colours?.length ? initial.colours.map(c => ({ ...c, images: [...c.images] })) : initial ? [{ name: initial.colour, tone: initial.tone, images: [initial.image] }] : []);
   const [presetQ, setPresetQ] = useState('');
   const [customName, setCustomName] = useState(''); const [customHex, setCustomHex] = useState('#8a8a8a'); const [customTone, setCustomTone] = useState('onyx');
-  const [stock, setStock] = useState<Record<string, number>>(() => { const m: Record<string, number> = {}; sizes.forEach(s => { m[s] = initial ? sizeStock(initial, s) : 25; }); return m; });
   const totalImages = new Set(images).size;
   const usedImages = new Set(colours.flatMap(c => c.images));
   const orphanImages = images.filter(src => !usedImages.has(src));
@@ -435,7 +434,11 @@ export function ProductEditor({ initial, onSaved, onClose }: { initial: Product 
       colour: primary.name, tone: primary.tone,
       price,
       image: imgs[0]!, images: imgs,
-      stockBySize: { ...stock }, status, sku: sku.trim() || `HG-${slugify(name).slice(0, 5).toUpperCase()}`,
+      // Stock is not written from here. The Inventory screen owns it, and
+    // PostgREST leaves a column alone when the payload does not mention it,
+    // so omitting it keeps the database's figure rather than blanking it.
+    ...(initial?.stockBySize ? { stockBySize: initial.stockBySize } : {}),
+    status, sku: sku.trim() || `HG-${slugify(name).slice(0, 5).toUpperCase()}`,
       ...(description.trim() ? { description: description.trim() } : {}),
       ...(saleNum != null ? { salePrice: saleNum } : {}),
       ...(badge ? { badge } : {}),
@@ -460,14 +463,14 @@ export function ProductEditor({ initial, onSaved, onClose }: { initial: Product 
       {colours.map((c, i) => <div key={i} className="colour-card"><div className="colour-card-head"><span className="preset-dot" style={{ background: c.hex ?? '#ccc' }} /><strong>{c.name || 'Unnamed colour'}</strong><small>{c.tone}</small><span className="spacer" /><Button variant="tool" type="button" aria-label="Duplicate colour" onClick={() => setColours(cs => [...cs, { ...c, name: `${c.name} Alt`, images: [...c.images] }])}><Copy size={14} /></Button><Button variant="tool" type="button" aria-label="Remove colour" onClick={() => setColours(cs => cs.filter((_, n) => n !== i))}><Trash2 size={14} /></Button></div><p className="fine-print">Tap its image below{c.images.length ? '' : ' — none linked yet'}:</p><div className="thumb-pick">{images.map(src => <button key={src} type="button" className={`thumb ${c.images.includes(src) ? 'selected' : ''}`} aria-label={`Use this image for ${c.name || 'colour'}`} aria-pressed={c.images.includes(src)} onClick={() => assignImage(i, src)}><img src={src} alt="" />{c.images.includes(src) && <Check size={14} />}</button>)}{images.length === 0 && <span className="fine-print">Add media first (section 2).</span>}</div></div>)}
       {(orphanImages.length > 0 || imageless.length > 0) && <p className="field-warn">{orphanImages.length > 0 && `${orphanImages.length} image${orphanImages.length > 1 ? 's' : ''} not linked to any colour. `}{imageless.length > 0 && `${imageless.length} colour${imageless.length > 1 ? 's' : ''} without image (uses cover).`}</p>}</section>
     <section className="admin-panel"><h2>4 · Pricing</h2><div className="form-grid"><label className="form-field">Price (£)<input type="number" min={0} step={0.01} value={price} onChange={e => setPrice(Math.max(0, num(e.target.value)))} required /></label><label className="form-field">Compare-at price (£)<input type="number" min={0} step={0.01} value={sale} placeholder="No sale" onChange={e => setSale(e.target.value === '' ? '' : Math.max(0, num(e.target.value)))} /></label></div>{sale !== '' && Number(sale) > 0 && Number(sale) < price ? <p className="field-ok">Shows as <del>{money(price)}</del> {money(Number(sale))} + SALE badge.</p> : <p className="fine-print">Set a lower compare-at price to trigger the sale look.</p>}</section>
-    <section className="admin-panel"><h2>5 · Inventory</h2><div className="form-grid"><label className="form-field">SKU<input value={sku} onChange={e => setSku(e.target.value)} placeholder="auto" /></label></div><div className="stock-matrix">{sizes.map(s => <label key={s} className="form-field">{s}<input type="number" min={0} value={stock[s] ?? 0} onChange={e => setStock(m => ({ ...m, [s]: Math.max(0, num(e.target.value)) }))} /></label>)}</div><p className="fine-print">Zero everywhere hides the product from shoppers (status stays).</p></section>
+    <section className="admin-panel"><h2>5 · Inventory</h2><div className="form-grid"><label className="form-field">SKU<input value={sku} onChange={e => setSku(e.target.value)} placeholder="auto" /></label></div><p className="fine-print">Stock per size is edited on the Inventory screen, so there is one place that owns it. Current stock: {sizes.map((s) => `${s} ${initial ? sizeStock(initial, s) : 0}`).join(' · ')}.</p><Link to="/admin/inventory" search={{ q: initial?.id ?? '' }} className="text-link">EDIT STOCK →</Link></section>
     <section className="admin-panel"><h2>6 · Organization</h2><div className="form-grid"><label className="form-field">Category<select value={category} onChange={e => setCategory(e.target.value)}>{[...new Set([...catOptions, category])].map(c => <option key={c}>{c}</option>)}</select></label><label className="form-field">Badge<select value={badge} onChange={e => setBadge(e.target.value)}><option value="">No badge</option>{badges.map(b => <option key={b}>{b}</option>)}</select></label><label className="form-field">Photo style<select value={crop} onChange={e => setCrop(e.target.value)}><option value="">Standard</option><option value="leggings">Leggings crop</option><option value="bra">Top crop</option></select></label><label className="form-field">Status<select value={status} onChange={e => setStatus(e.target.value as ProductStatus)}><option>Active</option><option>Draft</option></select></label></div></section>
     <section className="admin-panel"><h2>7 · Store preview</h2><div className="preview-mini"><div className="product-photo"><img src={preview.image} alt="" />{preview.badge && <span className="product-badge">{preview.badge}</span>}</div><div className="product-info"><span>{preview.name}</span><span>{preview.salePrice ? <><del>{money(preview.price)}</del> {money(preview.salePrice)}</> : money(preview.price)}</span></div><p className="product-colour">{preview.colour || '—'}{colours.length > 1 && ` · ${colours.length} colours`}</p><div className="swatches">{colours.slice(0, 4).map(c => <span key={c.name} title={c.name} className={`swatch ${c.tone}`} style={c.hex ? { background: c.hex } : undefined} />)}</div></div></section>
     <div className="editor-foot"><Button variant="fashion" type="submit">SAVE PRODUCT</Button></div></form>;
 }
 
 // --- inventory ------------------------------------------------------------------
-export function AdminInventory() {
+export function AdminInventory({ focus }: { focus?: string | undefined }) {
   const products = useProducts();
   const [drafts, setDrafts] = useState<Record<string, Record<string, number>>>({});
   function setDraft(id: string, size: string, v: number) {
@@ -481,10 +484,10 @@ export function AdminInventory() {
     setDrafts(d => { const n = { ...d }; delete n[id]; return n; });
     toast.success(`${p.name} stock updated.`);
   }
-  const low = products.filter(p => totalStock(p) <= lowAt());
+  const low = useLowStock();
   return <AdminLayout title="Inventory"><PageHead h1="Inventory" sub="Size-level stock across the collection." />
-    {low.length > 0 && <section className="admin-panel warn"><h2>Needs attention ({low.length})</h2>{low.map(p => <div key={p.id} className="manage-row"><div><strong>{p.name}</strong><small>{totalStock(p) === 0 ? 'Out of stock' : `Only ${totalStock(p)} left`}</small></div><Link to="/admin/products" search={{ q: p.name }} className="text-link">EDIT →</Link></div>)}</section>}
-    <section className="admin-panel"><div className="table-scroll stock-scroll"><table className="admin-table stock-table"><thead><tr><th scope="col" className="sticky-col">Product</th>{sizes.map(s => <th key={s}>{s}</th>)}<th>Total</th><th scope="col" /></tr></thead><tbody>{products.map(p => <tr key={p.id}><td className="sticky-col"><div className="admin-product-cell"><img src={productImage(p)} alt="" /><span>{p.name}</span></div></td>{sizes.map(s => { const v = drafts[p.id]?.[s] ?? sizeStock(p, s); return <td key={s}><input className={`stock-input ${v === 0 ? 'zero' : v <= lowAt() ? 'low' : ''}`} type="number" min={0} value={v} onChange={e => { if (e.target.value.trim() === '') return; setDraft(p.id, s, Number(e.target.value)); }} aria-label={`${p.name} ${s} stock`} /></td>; })}<td><strong>{sizes.reduce((n, s) => n + (drafts[p.id]?.[s] ?? sizeStock(p, s)), 0)}</strong></td><td>{drafts[p.id] && <Button variant="quiet" size="sm" onClick={() => save(p.id)}>Save</Button>}</td></tr>)}</tbody></table></div></section></AdminLayout>;
+    {low.length > 0 && <section className="admin-panel warn"><h2>Needs attention ({low.length})</h2>{low.map(p => <div key={p.id} className="manage-row"><div><strong>{p.name}</strong><small>{totalStock(p) === 0 ? 'Out of stock' : `Only ${totalStock(p)} left`}</small></div><Link to="/admin/products" search={{ q: p.id }} className="text-link">RESTOCK →</Link></div>)}</section>}
+    <section className="admin-panel"><div className="table-scroll stock-scroll"><table className="admin-table stock-table"><thead><tr><th scope="col" className="sticky-col">Product</th>{sizes.map(s => <th key={s}>{s}</th>)}<th>Total</th><th scope="col" /></tr></thead><tbody>{products.map(p => <tr key={p.id} ref={(el) => { if (el && focus === p.id) el.scrollIntoView({ block: 'center' }); }} className={focus === p.id ? 'focused' : undefined}><td className="sticky-col"><div className="admin-product-cell"><img src={productImage(p)} alt="" /><span>{p.name}</span></div></td>{sizes.map(s => { const v = drafts[p.id]?.[s] ?? sizeStock(p, s); return <td key={s}><input className={`stock-input ${v === 0 ? 'zero' : v <= lowAt() ? 'low' : ''}`} type="number" min={0} value={v} onChange={e => { if (e.target.value.trim() === '') return; setDraft(p.id, s, Number(e.target.value)); }} aria-label={`${p.name} ${s} stock`} /></td>; })}<td><strong>{sizes.reduce((n, s) => n + (drafts[p.id]?.[s] ?? sizeStock(p, s)), 0)}</strong></td><td>{drafts[p.id] && <Button variant="quiet" size="sm" onClick={() => save(p.id)}>Save</Button>}</td></tr>)}</tbody></table></div></section></AdminLayout>;
 }
 
 // --- categories -------------------------------------------------------------------
@@ -585,27 +588,12 @@ export function DiscountEditor({ initial, onSaved }: { initial: Discount | undef
 
 // --- analytics --------------------------------------------------------------------------
 export function AdminAnalytics() {
-  const [all, setAll] = useState<Order[]>([]);
-  useEffect(() => {
-    listOrders().then(setAll);
-    const off = subscribeToStoreEvent('orders:changed', () => listOrders().then(setAll));
-    return off;
-  }, []);
-  const orders = all.filter(o => o.status !== 'Cancelled');
-  const revenue = orders.reduce((n, o) => n + o.total, 0);
-  const aov = orders.length ? revenue / orders.length : 0;
-  const byCat = new Map<string, { units: number; rev: number }>();
-  for (const o of orders) for (const it of o.items) {
-    const p = getProduct(it.productId);
-    const cat = p?.category ?? '—';
-    const s = byCat.get(cat) ?? { units: 0, rev: 0 };
-    s.units += it.qty; s.rev += it.qty * it.price; byCat.set(cat, s);
-  }
-  const cod = orders.filter(o => o.payment === 'cod').length;
-  const bank = orders.filter(o => o.payment === 'bank').length;
+  const { orders: all } = useOrders();
+  const { live: orders, revenue, averageOrderValue: aov, codCount: cod, bankCount: bank } = useOrderMetrics(all);
+  const byCat = useRevenueByCategory(orders);
   return <AdminLayout title="Analytics"><PageHead h1="Understand your momentum." sub="Computed from real orders — no sample charts." />
     <div className="metric-grid">{[['Revenue', money(revenue)], ['Orders', String(orders.length)], ['Average order value', money(aov)], ['Cash on delivery share', orders.length ? `${Math.round((cod / orders.length) * 100)}%` : '—']].map(([k, v]) => <div className="metric" key={k}><span>{k}</span><strong>{v}</strong></div>)}</div>
-    <div className="admin-chart-layout"><section className="admin-panel"><div className="admin-panel-title"><h2>Revenue by category</h2><span>{byCat.size} categories</span></div>{byCat.size === 0 ? <p className="fine-print">Item-level data appears once customers check out.</p> : [...byCat.entries()].sort((a, b) => b[1].rev - a[1].rev).map(([c, s]) => <div className="manage-row" key={c}><div><strong>{c}</strong><small>{s.units} units sold</small></div><strong>{money(s.rev)}</strong></div>)}</section>
+    <div className="admin-chart-layout"><section className="admin-panel"><div className="admin-panel-title"><h2>Revenue by category</h2><span>{byCat.length} categories</span></div>{byCat.length === 0 ? <p className="fine-print">Item-level data appears once customers check out.</p> : byCat.map((c) => <div className="manage-row" key={c.category}><div><strong>{c.category}</strong><small>{c.units} units sold</small></div><strong>{money(c.rev)}</strong></div>)}</section>
       <section className="admin-panel"><div className="admin-panel-title"><h2>Payment split</h2><span>{orders.length} orders</span></div><div className="manage-row"><div><strong>Cash on delivery</strong></div><strong>{cod}</strong></div><div className="manage-row"><div><strong>Bank transfer</strong></div><strong>{bank}</strong></div></section></div></AdminLayout>;
 }
 
@@ -758,7 +746,7 @@ export function AdminOrderDraft() {
   const [guestName, setGuestName] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
   const [q, setQ] = useState('');
-  const [lines, setLines] = useState<{ id: string; size: string; qty: number }[]>([]);
+  const [lines, setLines] = useState<{ id: string; size: string; colour: string; qty: number }[]>([]);
   const [addr, setAddr] = useState({ firstName: '', lastName: '', street: '', city: '', postcode: '', country: 'United Kingdom', phone: '' });
   const [pay, setPay] = useState<'cod' | 'bank'>('cod');
   const [error, setError] = useState('');
@@ -772,13 +760,16 @@ export function AdminOrderDraft() {
     if (!p) return;
     const size = sizes.find((s) => sizeStock(p, s) > 0);
     if (!size) { toast.error(`${p.name} is out of stock.`); return; }
+    // A manual order carries the colour the customer chose on the phone, so a
+    // draft line is colour-aware exactly like a storefront order line.
+    const colour = p.colour || productColours(p)[0]?.name || '';
     setLines((ls) => {
-      const found = ls.find((l) => l.id === id && l.size === size);
+      const found = ls.find((l) => l.id === id && l.size === size && l.colour === colour);
       if (found) {
         if (found.qty + 1 > sizeStock(p, size)) { toast.error(`Only ${sizeStock(p, size)} left in ${size}.`); return ls; }
         return ls.map((l) => (l === found ? { ...l, qty: l.qty + 1 } : l));
       }
-      return [...ls, { id, size, qty: 1 }];
+      return [...ls, { id, size, colour, qty: 1 }];
     });
     setQ('');
   }
@@ -806,16 +797,15 @@ export function AdminOrderDraft() {
         const order = await createOrder({
           email, customer,
           address: { firstName: addr.firstName || customer.split(' ')[0]!, lastName: addr.lastName || customer.split(' ').slice(1).join(' ') || '—', street: addr.street, city: addr.city, postcode: addr.postcode, country: addr.country, phone: addr.phone },
-          items: detailed.map(({ line, p }) => ({ productId: p!.id, name: p!.name, colour: p!.colour, size: line.size, qty: line.qty, price: effectivePrice(p!), image: p!.image })),
+          items: detailed.map(({ line, p }) => ({ productId: p!.id, name: p!.name, colour: line.colour || p!.colour, size: line.size, qty: line.qty, price: effectivePrice(p!), image: p!.image })),
           subtotal, discount: 0, total, payment: pay,
           shipping: { method: shipMethod.label, price: shipPrice },
           clientKey: draftKey.current,
         });
-        for (const { line, p } of detailed) {
-          const next = { ...p! };
-          next.stockBySize = { ...(next.stockBySize ?? {}), [line.size]: Math.max(0, sizeStock(p!, line.size) - line.qty) };
-          void upsertProduct(next);
-        }
+        // The trigger already decremented stock atomically when it priced this
+        // order; writing the product row back from here would overwrite that
+        // decrement with a pre-order snapshot.
+        for (const { line, p } of detailed) adjustLocalStock(p!.id, line.size, line.qty);
         toast.success(`Draft order ${order.id} created — ${pay === 'bank' ? 'awaiting payment proof' : 'received'}.`);
         navigate({ to: '/admin/orders' });
       } catch (err) {
@@ -829,7 +819,7 @@ export function AdminOrderDraft() {
       <section className="admin-panel"><h2>Customer</h2><div className="form-grid"><label className="form-field">Name<input value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="Customer name" /></label><label className="form-field">Email<input type="email" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} placeholder="you@example.co.uk" /></label></div></section>
       <section className="admin-panel"><h2>Delivery address</h2><div className="form-grid"><label className="form-field">First name<input value={addr.firstName} onChange={(e) => setAddr({ ...addr, firstName: e.target.value })} /></label><label className="form-field">Last name<input value={addr.lastName} onChange={(e) => setAddr({ ...addr, lastName: e.target.value })} /></label><label className="form-field full">Street<input value={addr.street} onChange={(e) => setAddr({ ...addr, street: e.target.value })} /></label><label className="form-field">Town / city<input value={addr.city} onChange={(e) => setAddr({ ...addr, city: e.target.value })} /></label><label className="form-field">Postcode<input value={addr.postcode} onChange={(e) => setAddr({ ...addr, postcode: e.target.value })} /></label><label className="form-field">Phone<input value={addr.phone} onChange={(e) => setAddr({ ...addr, phone: e.target.value })} /></label></div></section>
     </div><div className="admin-chart-layout">
-      <section className="admin-panel"><h2>Items</h2><label className="form-field">Add product<input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or colour…" /></label>{results.length > 0 && <div className="pick-grid">{results.map((p) => <button key={p.id} type="button" className="pick-card" aria-label={`Add ${p.name} to draft order`} onClick={() => addLine(p.id)}><img src={p.image} alt="" /><span>{p.name}</span><span>{money(effectivePrice(p))}</span></button>)}</div>}{detailed.length === 0 ? <p className="fine-print">No items yet.</p> : detailed.map(({ line, p }) => <div key={line.id + line.size} className="manage-row"><div><strong>{p!.name}</strong><small>{p!.colour} · {money(effectivePrice(p!))} each</small></div><div className="admin-actions"><select value={line.size} aria-label={`Size for ${p!.name}`} onChange={(e) => { const ns = e.target.value; setLines((ls) => ls.map((l) => l === line ? { ...l, size: ns, qty: Math.min(l.qty, Math.max(1, sizeStock(p!, ns))) } : l)); }}>{sizes.filter((s) => s === line.size || sizeStock(p!, s) > 0).map((s) => <option key={s} value={s}>{s}{sizeStock(p!, s) <= 0 ? ' (0 left)' : ''}</option>)}</select><Button variant="tool" type="button" aria-label={`Decrease quantity of ${p!.name} ${line.size}`} disabled={line.qty <= 1} onClick={() => setLines((ls) => ls.map((l) => (l === line ? { ...l, qty: Math.max(1, l.qty - 1) } : l)))}>−</Button><span>{line.qty}</span><Button variant="tool" type="button" aria-label={`Increase quantity of ${p!.name} ${line.size}`} disabled={line.qty >= sizeStock(p!, line.size)} onClick={() => setLines((ls) => ls.map((l) => { if (l !== line) return l; if (l.qty + 1 > sizeStock(p!, l.size)) { toast.error('No more stock in this size.'); return l; } return { ...l, qty: l.qty + 1 }; }))}>+</Button><Button variant="tool" type="button" aria-label={`Remove ${p!.name} ${line.size} from draft`} onClick={() => setLines((ls) => ls.filter((l) => l !== line))}><Trash2 size={14} /></Button></div></div>)}
+      <section className="admin-panel"><h2>Items</h2><label className="form-field">Add product<input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or colour…" /></label>{results.length > 0 && <div className="pick-grid">{results.map((p) => <button key={p.id} type="button" className="pick-card" aria-label={`Add ${p.name} to draft order`} onClick={() => addLine(p.id)}><img src={p.image} alt="" /><span>{p.name}</span><span>{money(effectivePrice(p))}</span></button>)}</div>}{detailed.length === 0 ? <p className="fine-print">No items yet.</p> : detailed.map(({ line, p }) => <div key={line.id + line.size + line.colour} className="manage-row"><div><strong>{p!.name}</strong><small>{line.colour || p!.colour} · {money(effectivePrice(p!))} each</small></div><div className="admin-actions">{productColours(p!).length>1&&<select value={line.colour||p!.colour} aria-label={`Colour for ${p!.name}`} onChange={(e)=>{const nc=e.target.value;setLines((ls)=>ls.map((l)=>l===line?{...l,colour:nc}:l));}}>{productColours(p!).map((c)=><option key={c.name} value={c.name}>{c.name}</option>)}</select>}<select value={line.size} aria-label={`Size for ${p!.name}`} onChange={(e) => { const ns = e.target.value; setLines((ls) => ls.map((l) => l === line ? { ...l, size: ns, qty: Math.min(l.qty, Math.max(1, sizeStock(p!, ns))) } : l)); }}>{sizes.filter((s) => s === line.size || sizeStock(p!, s) > 0).map((s) => <option key={s} value={s}>{s}{sizeStock(p!, s) <= 0 ? ' (0 left)' : ''}</option>)}</select><Button variant="tool" type="button" aria-label={`Decrease quantity of ${p!.name} ${line.size}`} disabled={line.qty <= 1} onClick={() => setLines((ls) => ls.map((l) => (l === line ? { ...l, qty: Math.max(1, l.qty - 1) } : l)))}>−</Button><span>{line.qty}</span><Button variant="tool" type="button" aria-label={`Increase quantity of ${p!.name} ${line.size}`} disabled={line.qty >= sizeStock(p!, line.size)} onClick={() => setLines((ls) => ls.map((l) => { if (l !== line) return l; if (l.qty + 1 > sizeStock(p!, l.size)) { toast.error('No more stock in this size.'); return l; } return { ...l, qty: l.qty + 1 }; }))}>+</Button><Button variant="tool" type="button" aria-label={`Remove ${p!.name} ${line.size} from draft`} onClick={() => setLines((ls) => ls.filter((l) => l !== line))}><Trash2 size={14} /></Button></div></div>)}
         <label className="form-field mt-6">Payment<select value={pay} onChange={(e) => setPay(e.target.value as 'cod' | 'bank')}><option value="cod">Cash on delivery</option><option value="bank">Bank transfer</option></select></label></section>
       <section className="admin-panel"><h2>Summary</h2><div className="bag-total"><span>Subtotal</span><strong>{money(subtotal)}</strong></div><div className="bag-total"><span>Delivery ({shipMethod.label})</span><span>{shipPrice === 0 ? 'FREE' : money(shipPrice)}</span></div><div className="bag-total grand"><span>Total</span><strong>{money(total)}</strong></div>{error && <p className="field-error" role="alert">{error}</p>}<div className="admin-actions end"><Button variant="fashion" type="submit" disabled={placing}>{placing ? 'CREATING…' : 'CREATE ORDER'}</Button></div></section>
     </div></form></AdminLayout>;

@@ -159,22 +159,6 @@ export function homepageFavourites(all: Product[], n = 4): Product[] {
 }
 
 export type NavLink = { label: string; handle: string };
-export function sidebarNav(): NavLink[] {
-  return [
-    { label: 'New In', handle: 'new' },
-    ...visibleCategoryNames().map((name) => ({ label: name, handle: name })),
-  ];
-}
-
-export function headerNav(): NavLink[] {
-  const cats = visibleCategoryNames();
-  const links: NavLink[] = [{ label: 'New In', handle: 'new' }, { label: 'Clothing', handle: 'all' }];
-  if (cats.includes('Hoodies')) links.push({ label: 'Hoodies', handle: 'Hoodies' });
-  if (cats.includes('Matching Sets')) links.push({ label: 'Sets', handle: 'Matching Sets' });
-  links.push({ label: 'Best Sellers', handle: 'best' });
-  return links;
-}
-
 export function useHeaderNav(): NavLink[] {
   const cats = useVisibleCategories();
   return useMemo(() => {

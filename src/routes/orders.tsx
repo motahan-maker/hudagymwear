@@ -35,7 +35,7 @@ function OrderList({list,detail,setDetail,current}:{list:Order[];detail:string|n
    if(!p){skipped.push(it.name);continue;}
    const q=Math.min(it.qty,sizeStock(p,it.size));
    if(q<=0){skipped.push(`${it.name} (${it.size})`);continue;}
-   for(let k=0;k<q;k++)add(it.productId,it.size);
+   for(let k=0;k<q;k++)add(it.productId,it.size,it.colour);
    n+=q;
   }
   if(n>0){toast.success(`${n} piece${n>1?'s':''} re-added — review your bag.`);setDetail(null);}

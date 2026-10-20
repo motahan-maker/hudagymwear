@@ -1,5 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nitro",
+  "buildCommand": "npm run build",
+  "outputDirectory": ".output",
   "headers": [
     {
       "source": "/(.*)",
@@ -13,16 +16,38 @@
           "value": "SAMEORIGIN"
         },
         {
-          "key": "X-XSS-Protection",
-          "value": "1; mode=block"
-        },
-        {
           "key": "Referrer-Policy",
           "value": "strict-origin-when-cross-origin"
         },
         {
           "key": "Permissions-Policy",
           "value": "camera=(), microphone=(), geolocation=()"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=63072000; includeSubDomains; preload"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'"
+        }
+      ]
+    },
+    {
+      "source": "/admin",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/admin/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
         }
       ]
     },
@@ -61,5 +86,27 @@
         }
       ]
     }
+  ],
+  "redirects": [
+    { "source": "/leggings", "destination": "/shop?category=Leggings", "permanent": true },
+    { "source": "/sports-bras", "destination": "/shop?category=Sports%20Bras", "permanent": true },
+    { "source": "/tops", "destination": "/shop?category=Tops", "permanent": true },
+    { "source": "/hoodies", "destination": "/shop?category=Hoodies", "permanent": true },
+    { "source": "/bottoms", "destination": "/shop?category=Bottoms", "permanent": true },
+    { "source": "/sets", "destination": "/shop?category=Matching%20Sets", "permanent": true },
+    { "source": "/accessories", "destination": "/shop?category=Accessories", "permanent": true },
+    { "source": "/new-arrivals", "destination": "/shop?category=new", "permanent": true },
+    { "source": "/best-sellers", "destination": "/shop?category=best", "permanent": true },
+    { "source": "/shipping", "destination": "/help?topic=delivery", "permanent": true },
+    { "source": "/returns", "destination": "/help?topic=delivery", "permanent": true },
+    { "source": "/faq", "destination": "/help?topic=faq", "permanent": true },
+    { "source": "/contact", "destination": "/help?topic=contact", "permanent": true },
+    { "source": "/size-guide", "destination": "/help?topic=sizing", "permanent": true },
+    { "source": "/collections/sculpt", "destination": "/shop?category=Matching%20Sets", "permanent": true },
+    { "source": "/collections/off-duty", "destination": "/shop?category=Hoodies", "permanent": true },
+    { "source": "/collections/new", "destination": "/shop?category=new", "permanent": true },
+    { "source": "/collections/new-in", "destination": "/shop?category=new", "permanent": true },
+    { "source": "/collections/best", "destination": "/shop?category=best", "permanent": true },
+    { "source": "/collections/best-sellers", "destination": "/shop?category=best", "permanent": true }
   ]
 }

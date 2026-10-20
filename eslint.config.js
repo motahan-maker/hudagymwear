@@ -1,12 +1,17 @@
 import js from "@eslint/js";
-import eslintPluginPrettier from "eslint-plugin-prettier/recommended";
 import globals from "globals";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", ".output", ".vinxi"] },
+  {
+    // Build output, the router's scratch directory, and the Supabase Edge
+    // Functions. The Edge Functions are Deno code with their own toolchain and
+    // their own globals; linting them with browser globals produces noise, not
+    // findings. They are formatted with `deno fmt`, not Prettier.
+    ignores: ["dist", ".output", ".vinxi", ".tanstack", "supabase/functions"],
+  },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
@@ -36,5 +41,4 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": "off",
     },
   },
-  eslintPluginPrettier,
 );

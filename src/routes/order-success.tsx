@@ -1,9 +1,9 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
-import { Check, MessageCircle } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { AlertCircle, Check, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { pageHead, money } from '@/lib/catalog';
-import { getGuestOrder, getOrder, setTransferProof, type Order } from '@/lib/orders';
+import { getGuestOrder, getOrder, lastOrder, setTransferProof, type Order } from '@/lib/orders';
 import { uploadTransferProof } from '@/lib/product-images';
 import { getSettings, whatsappLink } from '@/lib/shop-settings';
 export const Route=createFileRoute('/order-success')({validateSearch:(s:Record<string,unknown>)=>({order:typeof s['order']==='string'?s['order']:'',email:typeof s['email']==='string'?s['email']:''}),head:()=>pageHead('Order Confirmed','Your HUDA GYMWEAR order is confirmed.'),component:Success});
@@ -22,7 +22,14 @@ function Success(){
   const [loading,setLoading]=useState(!!orderId);
   const [uploading,setUploading]=useState(false);
   const [uploadError,setUploadError]=useState('');
-  useEffect(()=>{if(!orderId){setLoading(false);return;}setLoading(true);fetchOrder(orderId,searchEmail).then(o=>{setOrder(o);setLoading(false);});},[orderId,searchEmail]);
+  const [attempt,setAttempt]=useState(0);
+  // If the query string was lost, fall back to the order this device placed
+  // last. Without it the page cannot tell "placed but not loaded" from
+  // "never placed", and would either lie or cry wolf.
+  const remembered=useMemo(()=>(orderId||searchEmail)?null:lastOrder(),[orderId,searchEmail]);
+  const effectiveId=orderId||remembered?.id||'';
+  const effectiveEmail=searchEmail||remembered?.email||'';
+  useEffect(()=>{if(!effectiveId){setLoading(false);setOrder(null);return;}setLoading(true);fetchOrder(effectiveId,effectiveEmail).then(o=>{setOrder(o);setLoading(false);});},[effectiveId,effectiveEmail,attempt]);
   const settings=getSettings();
   const wa=order?whatsappLink(`Hello HUDA GYMWEAR! I just placed order ${order.id} (${money(order.total)})${order.transferRef?` — transfer ref: ${order.transferRef}`:''}. Here is my transfer receipt.`):null;
   async function onReceipt(e:React.ChangeEvent<HTMLInputElement>){
@@ -43,7 +50,7 @@ function Success(){
     finally{setUploading(false);}
   }
   if(loading)return <section className="empty-state section"><p className="fine-print">Confirming your order…</p></section>;
-  if(!order)return <section className="empty-state section"><Check size={45}/><span className="eyebrow brand-accent">YOUR NEXT MOVE LOOKS GOOD</span><h1>All set. All you.</h1><p>Thank you for shopping with HUDA GYMWEAR.</p><div className="account-welcome"><Button variant="fashion" asChild><Link to="/orders">TRACK YOUR ORDERS</Link></Button><Button variant="quiet" asChild><Link to="/shop">KEEP EXPLORING</Link></Button></div></section>;
+  if(!order)return <section className="empty-state section"><AlertCircle size={45}/><span className="eyebrow">WE COULDN'T LOAD THE CONFIRMATION</span><h1>{effectiveId?'Your order is safe, but we could not load it just now.':'We could not find that order.'}</h1><p>{effectiveId?'Your order was placed and we have your order number. This page just could not reach it. Try again, or look it up below with your order number and email.':'Look it up with your order number and the email you used at checkout.'}</p><div className="account-welcome"><Button variant="fashion" onClick={()=>setAttempt(a=>a+1)}>TRY AGAIN</Button><Button variant="quiet" asChild><Link to="/orders">TRACK YOUR ORDERS</Link></Button></div>{effectiveId&&<p className="fine-print">Your order number is {effectiveId}.</p>}</section>;
   return <section className="empty-state section"><Check size={45}/><span className="eyebrow brand-accent">ORDER {order.id} CONFIRMED</span><h1>All set. All you.</h1><p>Thank you, {order.customer}. Track it anytime with your order number and email.</p>
   {order.payment==='bank'&&order.paymentStatus!=='Paid'&&<div className="bank-card wide"><h3>Complete your bank transfer — {money(order.total)}</h3><dl><div><dt>Bank</dt><dd>{settings.bankName||'—'}</dd></div><div><dt>Account name</dt><dd>{settings.accountName||'—'}</dd></div><div><dt>Account number</dt><dd>{settings.accountNumber||'—'}</dd></div><div><dt>IBAN</dt><dd>{settings.iban||'—'}</dd></div></dl>{order.transfer_proof_url?<p className="field-ok">Receipt received — we will approve it shortly, then start packing.</p>:<p className="fine-print">Upload your receipt here so we can approve it faster — or send it on WhatsApp below.</p>}<label className="form-field">Upload transfer receipt (image)<input type="file" accept="image/*" onChange={onReceipt} disabled={uploading} aria-label="Upload transfer receipt"/>{uploading&&<span className="fine-print">Uploading your receipt…</span>}{uploadError&&<small className="field-error" role="alert">{uploadError}</small>}</label>{wa?<Button variant="fashion" asChild><a href={wa} target="_blank" rel="noreferrer"><MessageCircle size={16}/> SEND RECEIPT ON WHATSAPP</a></Button>:<p className="fine-print">WhatsApp checkout support is coming soon.</p>}<p className="fine-print">We start packing as soon as your payment is approved.</p></div>}
   {order.payment==='cod'&&<p className="preview-note">Cash on delivery — please have {money(order.total)} ready when your order arrives.</p>}

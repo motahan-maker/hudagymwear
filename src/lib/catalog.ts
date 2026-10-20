@@ -3,7 +3,7 @@ import black from '@/assets/black-set.jpg';
 import taupe from '@/assets/taupe-set.jpg';
 import grey from '@/assets/grey-set.jpg';
 import burgundy from '@/assets/burgundy-hoodie.jpg';
-import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
+import { getSupabase } from '@/lib/supabase';
 import { broadcastStoreEvent, subscribeToStoreEvent } from './realtime';
 
 // ---------------------------------------------------------------------------
@@ -112,13 +112,6 @@ export function guessTone(name: string): string {
 export const categories = ['Leggings','Sports Bras','Tops','Hoodies','Bottoms','Matching Sets','Accessories'];
 export const badges = ['NEW','BESTSELLER','SALE'];
 
-export const galleryImages = [
-  { id: 'black', src: black, label: 'Onyx set' },
-  { id: 'taupe', src: taupe, label: 'Taupe set' },
-  { id: 'grey', src: grey, label: 'Charcoal set' },
-  { id: 'burgundy', src: burgundy, label: 'Burgundy hoodie' },
-];
-
 export const money = (n:number) => new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP'}).format(n);
 export function effectivePrice(p: { price: number; salePrice?: number }): number {
   return p.salePrice ?? p.price;
@@ -211,7 +204,7 @@ function persistSynced(list: Product[]) {
 export const products: Product[] = buildCatalogue();
 
 // Reactive listeners
-let productListeners: Set<() => void> = new Set();
+const productListeners: Set<() => void> = new Set();
 let productVersion = 0;
 
 export function subscribeProducts(listener: () => void): () => void {
@@ -291,7 +284,7 @@ export type ProductRow = {
   image: string;
   images: string[] | null;
   colours: ProductColour[] | null;
-  stock_by_size: StockMap | null;
+  stock_by_size?: StockMap | null;
   sku: string | null;
   crop: string | null;
   created_at?: string;
@@ -335,7 +328,11 @@ export function toRow(p: Product): ProductRow {
     image: p.image,
     images: p.images ?? (p.image ? [p.image] : []),
     colours: p.colours ?? [],
-    stock_by_size: p.stockBySize ?? {},
+    // Only sent when the product actually carries a per-size map. PostgREST
+    // updates only the columns it is given, so leaving this out keeps the
+    // database's stock instead of blanking it — which is what happened
+    // whenever a product was saved without a per-size map of its own.
+    ...(p.stockBySize ? { stock_by_size: { ...p.stockBySize } } : {}),
     sku: p.sku ?? null,
     crop: p.crop ?? null,
   };
@@ -385,6 +382,33 @@ export async function upsertProduct(p: Product): Promise<void> {
   } catch { /* ignore */ }
 }
 
+/**
+ * Reflect a stock change in the local catalogue only.
+ *
+ * The database owns stock. The `recalculate_order` trigger decrements
+ * `stock_by_size` atomically when an order is inserted, and it does so inside
+ * the same statement that prices the order. Writing the product row back from
+ * the browser would overwrite that decrement with a snapshot taken before the
+ * order existed, so the browser adjusts only its own copy and leaves the row
+ * to the database. The persisted value is refreshed by the realtime
+ * `products:changed` event.
+ */
+export function adjustLocalStock(productId: string, size: string, quantity: number): void {
+  const i = products.findIndex((x) => x.id === productId);
+  if (i < 0) return;
+  const p = products[i];
+  if (!p) return;
+  if (p.stockBySize) {
+    products[i] = {
+      ...p,
+      stockBySize: { ...p.stockBySize, [size]: Math.max(0, (p.stockBySize[size] ?? 0) - quantity) },
+    };
+  } else if (p.stock != null) {
+    products[i] = { ...p, stock: Math.max(0, p.stock - quantity) };
+  }
+  notifyProductsChanged();
+}
+
 export async function deleteProduct(id: string): Promise<void> {
   const i = products.findIndex((x) => x.id === id);
   if (i >= 0) products.splice(i, 1);
@@ -414,6 +438,24 @@ function diff(base: Product, next: Product): Partial<Product> {
 
 export function slugify(name: string): string {
   return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 60) || `piece-${Date.now()}`;
+}
+
+/**
+ * Serialise structured data for a `<script type="application/ld+json">` block.
+ *
+ * `JSON.stringify` does not escape `<` or `>`, so a product name containing
+ * `</script>` would close the script element early and the rest of the value
+ * would be parsed as markup. Escaping the characters that can end a script
+ * element keeps the JSON valid and the document safe. `&` is escaped too so
+ * the block cannot be broken out of by an HTML entity.
+ */
+export function jsonLd(data: unknown): string {
+  return JSON.stringify(data)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
 }
 
 // Hook into realtime events automatically

@@ -59,10 +59,6 @@ export async function approvedFor(productId: string): Promise<Review[]> {
     .filter((r) => r.productId === productId && r.status === 'approved')
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
-export async function pendingReviews(): Promise<Review[]> {
-  const all = await allReviews();
-  return all.filter((r) => r.status === 'pending');
-}
 export async function allReviews(): Promise<Review[]> {
   const sb = getSupabase();
   if (!sb) return readAllSync().sort((a, b) => b.createdAt.localeCompare(a.createdAt));

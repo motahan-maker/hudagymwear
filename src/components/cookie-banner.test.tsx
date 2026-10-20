@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { RouterProvider, createMemoryHistory, createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
-import { StoreProvider, CookieBanner } from "@/components/store";
+import { CookieBanner } from "@/components/store";
 
 // ACCEPT COOKIES reportedly hangs: clicking must persist + dismiss the banner.
 describe("CookieBanner", () => {

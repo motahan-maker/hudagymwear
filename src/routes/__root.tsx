@@ -13,6 +13,7 @@ import { useState, useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { StoreProvider, StoreShell } from "@/components/store";
+import { jsonLd } from "@/lib/catalog";
 import { initPwa } from "@/lib/pwa";
 
 function NotFoundComponent() {
@@ -136,7 +137,7 @@ function RootShell({ children }: { children: ReactNode }) {
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
+            __html: jsonLd({
               '@context': 'https://schema.org',
               '@type': 'ClothingStore',
               name: 'HUDA GYMWEAR',

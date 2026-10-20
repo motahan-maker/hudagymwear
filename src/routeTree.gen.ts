@@ -11,31 +11,17 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AboutRouteImport } from './routes/about'
-import { Route as AccessoriesRouteImport } from './routes/accessories'
-import { Route as BestSellersRouteImport } from './routes/best-sellers'
-import { Route as BottomsRouteImport } from './routes/bottoms'
 import { Route as CartRouteImport } from './routes/cart'
 import { Route as CheckoutRouteImport } from './routes/checkout'
-import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CookiesRouteImport } from './routes/cookies'
-import { Route as FaqRouteImport } from './routes/faq'
 import { Route as HelpRouteImport } from './routes/help'
-import { Route as HoodiesRouteImport } from './routes/hoodies'
 import { Route as LaunchRouteImport } from './routes/launch'
-import { Route as LeggingsRouteImport } from './routes/leggings'
 import { Route as LookbookRouteImport } from './routes/lookbook'
-import { Route as NewArrivalsRouteImport } from './routes/new-arrivals'
 import { Route as OrderSuccessRouteImport } from './routes/order-success'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as PrivacyRouteImport } from './routes/privacy'
-import { Route as ReturnsRouteImport } from './routes/returns'
-import { Route as SetsRouteImport } from './routes/sets'
-import { Route as ShippingRouteImport } from './routes/shipping'
 import { Route as ShopRouteImport } from './routes/shop'
-import { Route as SizeGuideRouteImport } from './routes/size-guide'
-import { Route as SportsBrasRouteImport } from './routes/sports-bras'
 import { Route as TermsRouteImport } from './routes/terms'
-import { Route as TopsRouteImport } from './routes/tops'
 import { Route as WishlistRouteImport } from './routes/wishlist'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminAnalyticsRouteImport } from './routes/admin/analytics'
@@ -49,7 +35,6 @@ import { Route as AdminPrintifyRouteImport } from './routes/admin/printify'
 import { Route as AdminProductsRouteImport } from './routes/admin/products'
 import { Route as AdminReviewsRouteImport } from './routes/admin/reviews'
 import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
-import { Route as CollectionsHandleRouteImport } from './routes/collections/$handle'
 import { Route as ProductIdRouteImport } from './routes/product/$id'
 import { Route as AdminOrdersNewRouteImport } from './routes/admin/orders.new'
 
@@ -63,21 +48,6 @@ const AboutRoute = AboutRouteImport.update({
   path: '/about',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AccessoriesRoute = AccessoriesRouteImport.update({
-  id: '/accessories',
-  path: '/accessories',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BestSellersRoute = BestSellersRouteImport.update({
-  id: '/best-sellers',
-  path: '/best-sellers',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BottomsRoute = BottomsRouteImport.update({
-  id: '/bottoms',
-  path: '/bottoms',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const CartRoute = CartRouteImport.update({
   id: '/cart',
   path: '/cart',
@@ -88,19 +58,9 @@ const CheckoutRoute = CheckoutRouteImport.update({
   path: '/checkout',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ContactRoute = ContactRouteImport.update({
-  id: '/contact',
-  path: '/contact',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const CookiesRoute = CookiesRouteImport.update({
   id: '/cookies',
   path: '/cookies',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FaqRoute = FaqRouteImport.update({
-  id: '/faq',
-  path: '/faq',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HelpRoute = HelpRouteImport.update({
@@ -108,29 +68,14 @@ const HelpRoute = HelpRouteImport.update({
   path: '/help',
   getParentRoute: () => rootRouteImport,
 } as any)
-const HoodiesRoute = HoodiesRouteImport.update({
-  id: '/hoodies',
-  path: '/hoodies',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const LaunchRoute = LaunchRouteImport.update({
   id: '/launch',
   path: '/launch',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LeggingsRoute = LeggingsRouteImport.update({
-  id: '/leggings',
-  path: '/leggings',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const LookbookRoute = LookbookRouteImport.update({
   id: '/lookbook',
   path: '/lookbook',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const NewArrivalsRoute = NewArrivalsRouteImport.update({
-  id: '/new-arrivals',
-  path: '/new-arrivals',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrderSuccessRoute = OrderSuccessRouteImport.update({
@@ -148,44 +93,14 @@ const PrivacyRoute = PrivacyRouteImport.update({
   path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ReturnsRoute = ReturnsRouteImport.update({
-  id: '/returns',
-  path: '/returns',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SetsRoute = SetsRouteImport.update({
-  id: '/sets',
-  path: '/sets',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ShippingRoute = ShippingRouteImport.update({
-  id: '/shipping',
-  path: '/shipping',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ShopRoute = ShopRouteImport.update({
   id: '/shop',
   path: '/shop',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SizeGuideRoute = SizeGuideRouteImport.update({
-  id: '/size-guide',
-  path: '/size-guide',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SportsBrasRoute = SportsBrasRouteImport.update({
-  id: '/sports-bras',
-  path: '/sports-bras',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
   path: '/terms',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TopsRoute = TopsRouteImport.update({
-  id: '/tops',
-  path: '/tops',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WishlistRoute = WishlistRouteImport.update({
@@ -253,11 +168,6 @@ const AdminSettingsRoute = AdminSettingsRouteImport.update({
   path: '/admin/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CollectionsHandleRoute = CollectionsHandleRouteImport.update({
-  id: '/collections/$handle',
-  path: '/collections/$handle',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ProductIdRoute = ProductIdRouteImport.update({
   id: '/product/$id',
   path: '/product/$id',
@@ -272,31 +182,17 @@ const AdminOrdersNewRoute = AdminOrdersNewRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
-  '/accessories': typeof AccessoriesRoute
-  '/best-sellers': typeof BestSellersRoute
-  '/bottoms': typeof BottomsRoute
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
-  '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
-  '/faq': typeof FaqRoute
   '/help': typeof HelpRoute
-  '/hoodies': typeof HoodiesRoute
   '/launch': typeof LaunchRoute
-  '/leggings': typeof LeggingsRoute
   '/lookbook': typeof LookbookRoute
-  '/new-arrivals': typeof NewArrivalsRoute
   '/order-success': typeof OrderSuccessRoute
   '/orders': typeof OrdersRoute
   '/privacy': typeof PrivacyRoute
-  '/returns': typeof ReturnsRoute
-  '/sets': typeof SetsRoute
-  '/shipping': typeof ShippingRoute
   '/shop': typeof ShopRoute
-  '/size-guide': typeof SizeGuideRoute
-  '/sports-bras': typeof SportsBrasRoute
   '/terms': typeof TermsRoute
-  '/tops': typeof TopsRoute
   '/wishlist': typeof WishlistRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/categories': typeof AdminCategoriesRoute
@@ -309,7 +205,6 @@ export interface FileRoutesByFullPath {
   '/admin/products': typeof AdminProductsRoute
   '/admin/reviews': typeof AdminReviewsRoute
   '/admin/settings': typeof AdminSettingsRoute
-  '/collections/$handle': typeof CollectionsHandleRoute
   '/product/$id': typeof ProductIdRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/orders/new': typeof AdminOrdersNewRoute
@@ -317,31 +212,17 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
-  '/accessories': typeof AccessoriesRoute
-  '/best-sellers': typeof BestSellersRoute
-  '/bottoms': typeof BottomsRoute
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
-  '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
-  '/faq': typeof FaqRoute
   '/help': typeof HelpRoute
-  '/hoodies': typeof HoodiesRoute
   '/launch': typeof LaunchRoute
-  '/leggings': typeof LeggingsRoute
   '/lookbook': typeof LookbookRoute
-  '/new-arrivals': typeof NewArrivalsRoute
   '/order-success': typeof OrderSuccessRoute
   '/orders': typeof OrdersRoute
   '/privacy': typeof PrivacyRoute
-  '/returns': typeof ReturnsRoute
-  '/sets': typeof SetsRoute
-  '/shipping': typeof ShippingRoute
   '/shop': typeof ShopRoute
-  '/size-guide': typeof SizeGuideRoute
-  '/sports-bras': typeof SportsBrasRoute
   '/terms': typeof TermsRoute
-  '/tops': typeof TopsRoute
   '/wishlist': typeof WishlistRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/categories': typeof AdminCategoriesRoute
@@ -354,7 +235,6 @@ export interface FileRoutesByTo {
   '/admin/products': typeof AdminProductsRoute
   '/admin/reviews': typeof AdminReviewsRoute
   '/admin/settings': typeof AdminSettingsRoute
-  '/collections/$handle': typeof CollectionsHandleRoute
   '/product/$id': typeof ProductIdRoute
   '/admin': typeof AdminIndexRoute
   '/admin/orders/new': typeof AdminOrdersNewRoute
@@ -363,31 +243,17 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
-  '/accessories': typeof AccessoriesRoute
-  '/best-sellers': typeof BestSellersRoute
-  '/bottoms': typeof BottomsRoute
   '/cart': typeof CartRoute
   '/checkout': typeof CheckoutRoute
-  '/contact': typeof ContactRoute
   '/cookies': typeof CookiesRoute
-  '/faq': typeof FaqRoute
   '/help': typeof HelpRoute
-  '/hoodies': typeof HoodiesRoute
   '/launch': typeof LaunchRoute
-  '/leggings': typeof LeggingsRoute
   '/lookbook': typeof LookbookRoute
-  '/new-arrivals': typeof NewArrivalsRoute
   '/order-success': typeof OrderSuccessRoute
   '/orders': typeof OrdersRoute
   '/privacy': typeof PrivacyRoute
-  '/returns': typeof ReturnsRoute
-  '/sets': typeof SetsRoute
-  '/shipping': typeof ShippingRoute
   '/shop': typeof ShopRoute
-  '/size-guide': typeof SizeGuideRoute
-  '/sports-bras': typeof SportsBrasRoute
   '/terms': typeof TermsRoute
-  '/tops': typeof TopsRoute
   '/wishlist': typeof WishlistRoute
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/categories': typeof AdminCategoriesRoute
@@ -400,7 +266,6 @@ export interface FileRoutesById {
   '/admin/products': typeof AdminProductsRoute
   '/admin/reviews': typeof AdminReviewsRoute
   '/admin/settings': typeof AdminSettingsRoute
-  '/collections/$handle': typeof CollectionsHandleRoute
   '/product/$id': typeof ProductIdRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/orders/new': typeof AdminOrdersNewRoute
@@ -410,31 +275,17 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/about'
-    | '/accessories'
-    | '/best-sellers'
-    | '/bottoms'
     | '/cart'
     | '/checkout'
-    | '/contact'
     | '/cookies'
-    | '/faq'
     | '/help'
-    | '/hoodies'
     | '/launch'
-    | '/leggings'
     | '/lookbook'
-    | '/new-arrivals'
     | '/order-success'
     | '/orders'
     | '/privacy'
-    | '/returns'
-    | '/sets'
-    | '/shipping'
     | '/shop'
-    | '/size-guide'
-    | '/sports-bras'
     | '/terms'
-    | '/tops'
     | '/wishlist'
     | '/admin/analytics'
     | '/admin/categories'
@@ -447,7 +298,6 @@ export interface FileRouteTypes {
     | '/admin/products'
     | '/admin/reviews'
     | '/admin/settings'
-    | '/collections/$handle'
     | '/product/$id'
     | '/admin/'
     | '/admin/orders/new'
@@ -455,31 +305,17 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/about'
-    | '/accessories'
-    | '/best-sellers'
-    | '/bottoms'
     | '/cart'
     | '/checkout'
-    | '/contact'
     | '/cookies'
-    | '/faq'
     | '/help'
-    | '/hoodies'
     | '/launch'
-    | '/leggings'
     | '/lookbook'
-    | '/new-arrivals'
     | '/order-success'
     | '/orders'
     | '/privacy'
-    | '/returns'
-    | '/sets'
-    | '/shipping'
     | '/shop'
-    | '/size-guide'
-    | '/sports-bras'
     | '/terms'
-    | '/tops'
     | '/wishlist'
     | '/admin/analytics'
     | '/admin/categories'
@@ -492,7 +328,6 @@ export interface FileRouteTypes {
     | '/admin/products'
     | '/admin/reviews'
     | '/admin/settings'
-    | '/collections/$handle'
     | '/product/$id'
     | '/admin'
     | '/admin/orders/new'
@@ -500,31 +335,17 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/about'
-    | '/accessories'
-    | '/best-sellers'
-    | '/bottoms'
     | '/cart'
     | '/checkout'
-    | '/contact'
     | '/cookies'
-    | '/faq'
     | '/help'
-    | '/hoodies'
     | '/launch'
-    | '/leggings'
     | '/lookbook'
-    | '/new-arrivals'
     | '/order-success'
     | '/orders'
     | '/privacy'
-    | '/returns'
-    | '/sets'
-    | '/shipping'
     | '/shop'
-    | '/size-guide'
-    | '/sports-bras'
     | '/terms'
-    | '/tops'
     | '/wishlist'
     | '/admin/analytics'
     | '/admin/categories'
@@ -537,7 +358,6 @@ export interface FileRouteTypes {
     | '/admin/products'
     | '/admin/reviews'
     | '/admin/settings'
-    | '/collections/$handle'
     | '/product/$id'
     | '/admin/'
     | '/admin/orders/new'
@@ -546,31 +366,17 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
-  AccessoriesRoute: typeof AccessoriesRoute
-  BestSellersRoute: typeof BestSellersRoute
-  BottomsRoute: typeof BottomsRoute
   CartRoute: typeof CartRoute
   CheckoutRoute: typeof CheckoutRoute
-  ContactRoute: typeof ContactRoute
   CookiesRoute: typeof CookiesRoute
-  FaqRoute: typeof FaqRoute
   HelpRoute: typeof HelpRoute
-  HoodiesRoute: typeof HoodiesRoute
   LaunchRoute: typeof LaunchRoute
-  LeggingsRoute: typeof LeggingsRoute
   LookbookRoute: typeof LookbookRoute
-  NewArrivalsRoute: typeof NewArrivalsRoute
   OrderSuccessRoute: typeof OrderSuccessRoute
   OrdersRoute: typeof OrdersRoute
   PrivacyRoute: typeof PrivacyRoute
-  ReturnsRoute: typeof ReturnsRoute
-  SetsRoute: typeof SetsRoute
-  ShippingRoute: typeof ShippingRoute
   ShopRoute: typeof ShopRoute
-  SizeGuideRoute: typeof SizeGuideRoute
-  SportsBrasRoute: typeof SportsBrasRoute
   TermsRoute: typeof TermsRoute
-  TopsRoute: typeof TopsRoute
   WishlistRoute: typeof WishlistRoute
   AdminAnalyticsRoute: typeof AdminAnalyticsRoute
   AdminCategoriesRoute: typeof AdminCategoriesRoute
@@ -583,7 +389,6 @@ export interface RootRouteChildren {
   AdminProductsRoute: typeof AdminProductsRoute
   AdminReviewsRoute: typeof AdminReviewsRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
-  CollectionsHandleRoute: typeof CollectionsHandleRoute
   ProductIdRoute: typeof ProductIdRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
@@ -604,27 +409,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AboutRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/accessories': {
-      id: '/accessories'
-      path: '/accessories'
-      fullPath: '/accessories'
-      preLoaderRoute: typeof AccessoriesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/best-sellers': {
-      id: '/best-sellers'
-      path: '/best-sellers'
-      fullPath: '/best-sellers'
-      preLoaderRoute: typeof BestSellersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/bottoms': {
-      id: '/bottoms'
-      path: '/bottoms'
-      fullPath: '/bottoms'
-      preLoaderRoute: typeof BottomsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/cart': {
       id: '/cart'
       path: '/cart'
@@ -639,25 +423,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CheckoutRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/contact': {
-      id: '/contact'
-      path: '/contact'
-      fullPath: '/contact'
-      preLoaderRoute: typeof ContactRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/cookies': {
       id: '/cookies'
       path: '/cookies'
       fullPath: '/cookies'
       preLoaderRoute: typeof CookiesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/faq': {
-      id: '/faq'
-      path: '/faq'
-      fullPath: '/faq'
-      preLoaderRoute: typeof FaqRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/help': {
@@ -667,13 +437,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HelpRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/hoodies': {
-      id: '/hoodies'
-      path: '/hoodies'
-      fullPath: '/hoodies'
-      preLoaderRoute: typeof HoodiesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/launch': {
       id: '/launch'
       path: '/launch'
@@ -681,25 +444,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LaunchRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/leggings': {
-      id: '/leggings'
-      path: '/leggings'
-      fullPath: '/leggings'
-      preLoaderRoute: typeof LeggingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/lookbook': {
       id: '/lookbook'
       path: '/lookbook'
       fullPath: '/lookbook'
       preLoaderRoute: typeof LookbookRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/new-arrivals': {
-      id: '/new-arrivals'
-      path: '/new-arrivals'
-      fullPath: '/new-arrivals'
-      preLoaderRoute: typeof NewArrivalsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/order-success': {
@@ -723,27 +472,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/returns': {
-      id: '/returns'
-      path: '/returns'
-      fullPath: '/returns'
-      preLoaderRoute: typeof ReturnsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/sets': {
-      id: '/sets'
-      path: '/sets'
-      fullPath: '/sets'
-      preLoaderRoute: typeof SetsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/shipping': {
-      id: '/shipping'
-      path: '/shipping'
-      fullPath: '/shipping'
-      preLoaderRoute: typeof ShippingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/shop': {
       id: '/shop'
       path: '/shop'
@@ -751,32 +479,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShopRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/size-guide': {
-      id: '/size-guide'
-      path: '/size-guide'
-      fullPath: '/size-guide'
-      preLoaderRoute: typeof SizeGuideRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/sports-bras': {
-      id: '/sports-bras'
-      path: '/sports-bras'
-      fullPath: '/sports-bras'
-      preLoaderRoute: typeof SportsBrasRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/terms': {
       id: '/terms'
       path: '/terms'
       fullPath: '/terms'
       preLoaderRoute: typeof TermsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/tops': {
-      id: '/tops'
-      path: '/tops'
-      fullPath: '/tops'
-      preLoaderRoute: typeof TopsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/wishlist': {
@@ -870,13 +577,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/collections/$handle': {
-      id: '/collections/$handle'
-      path: '/collections/$handle'
-      fullPath: '/collections/$handle'
-      preLoaderRoute: typeof CollectionsHandleRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/product/$id': {
       id: '/product/$id'
       path: '/product/$id'
@@ -909,31 +609,17 @@ const AdminOrdersRouteWithChildren = AdminOrdersRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
-  AccessoriesRoute: AccessoriesRoute,
-  BestSellersRoute: BestSellersRoute,
-  BottomsRoute: BottomsRoute,
   CartRoute: CartRoute,
   CheckoutRoute: CheckoutRoute,
-  ContactRoute: ContactRoute,
   CookiesRoute: CookiesRoute,
-  FaqRoute: FaqRoute,
   HelpRoute: HelpRoute,
-  HoodiesRoute: HoodiesRoute,
   LaunchRoute: LaunchRoute,
-  LeggingsRoute: LeggingsRoute,
   LookbookRoute: LookbookRoute,
-  NewArrivalsRoute: NewArrivalsRoute,
   OrderSuccessRoute: OrderSuccessRoute,
   OrdersRoute: OrdersRoute,
   PrivacyRoute: PrivacyRoute,
-  ReturnsRoute: ReturnsRoute,
-  SetsRoute: SetsRoute,
-  ShippingRoute: ShippingRoute,
   ShopRoute: ShopRoute,
-  SizeGuideRoute: SizeGuideRoute,
-  SportsBrasRoute: SportsBrasRoute,
   TermsRoute: TermsRoute,
-  TopsRoute: TopsRoute,
   WishlistRoute: WishlistRoute,
   AdminAnalyticsRoute: AdminAnalyticsRoute,
   AdminCategoriesRoute: AdminCategoriesRoute,
@@ -946,7 +632,6 @@ const rootRouteChildren: RootRouteChildren = {
   AdminProductsRoute: AdminProductsRoute,
   AdminReviewsRoute: AdminReviewsRoute,
   AdminSettingsRoute: AdminSettingsRoute,
-  CollectionsHandleRoute: CollectionsHandleRoute,
   ProductIdRoute: ProductIdRoute,
   AdminIndexRoute: AdminIndexRoute,
 }

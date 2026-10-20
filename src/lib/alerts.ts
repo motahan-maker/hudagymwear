@@ -399,12 +399,6 @@ export async function getRegistration(): Promise<ServiceWorkerRegistration | nul
 
 /** True when the app is running as an installed PWA (own window, no browser UI).
  *  Only in that mode do notifications behave like a real phone alert. */
-export function isStandaloneApp(): boolean {
-  if (typeof window === 'undefined') return false;
-  const mm = window.matchMedia?.('(display-mode: standalone)');
-  return Boolean(mm?.matches) || (navigator as unknown as { standalone?: boolean }).standalone === true;
-}
-
 type PhoneNotification = NotificationOptions & {
   vibrate?: number[] | undefined;
   renotify?: boolean | undefined;

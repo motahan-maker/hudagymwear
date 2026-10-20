@@ -3,24 +3,45 @@ Allow: /
 Disallow: /admin/
 Disallow: /checkout
 Disallow: /order-success
+Disallow: /cart
+Disallow: /orders
+Disallow: /wishlist
 
 User-agent: Bingbot
 Allow: /
 Disallow: /admin/
 Disallow: /checkout
 Disallow: /order-success
+Disallow: /cart
+Disallow: /orders
+Disallow: /wishlist
 
 User-agent: Twitterbot
 Allow: /
+Disallow: /admin/
+Disallow: /checkout
+Disallow: /order-success
+Disallow: /cart
+Disallow: /orders
+Disallow: /wishlist
 
 User-agent: facebookexternalhit
 Allow: /
+Disallow: /admin/
+Disallow: /checkout
+Disallow: /order-success
+Disallow: /cart
+Disallow: /orders
+Disallow: /wishlist
 
 User-agent: *
 Allow: /
 Disallow: /admin/
 Disallow: /checkout
 Disallow: /order-success
+Disallow: /cart
+Disallow: /orders
+Disallow: /wishlist
 
 # Production sitemap — regenerate after domain changes:
 #   SITE_URL=https://YOUR-DOMAIN npm run sitemap
