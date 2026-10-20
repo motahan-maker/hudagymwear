@@ -237,7 +237,7 @@ export function AdminLayout({ children, title }: { children: ReactNode; title: s
     </div>
   );
 }
-function PageHead({ eyebrow, h1, sub, children }: { eyebrow?: string; h1: string; sub?: string; children?: ReactNode }) {
+export function PageHead({ eyebrow, h1, sub, children }: { eyebrow?: string; h1: string; sub?: string; children?: ReactNode }) {
   return <div className="admin-page-title"><div>{eyebrow && <span className="eyebrow">{eyebrow}</span>}<h1>{h1}</h1>{sub && <p>{sub}</p>}</div><div className="admin-actions">{children}</div></div>;
 }
 function money0(n: number) { return money(Math.round(n * 100) / 100); }

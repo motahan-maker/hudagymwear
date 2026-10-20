@@ -68,3 +68,58 @@ select 'storage buckets' as check_name,
 select 'helpers locked down' as check_name,
   not has_function_privilege('anon', 'public.recalculate_order()', 'execute')
   and not has_function_privilege('anon', 'public.restock_on_cancel()', 'execute') as ok;
+
+-- ---------------------------------------------------------------------------
+-- PREFLIGHT for migration 0012 (recalculate_order_v2)
+-- ---------------------------------------------------------------------------
+-- 0012 stops the order trigger accepting a browser-supplied price for a
+-- product that is not in the catalogue. Run this BEFORE applying it.
+--
+-- 9. Every product id referenced by a recent order exists in `products`.
+--    Any row here means an order would start failing with "This item is no
+--    longer available". Investigate before applying 0012.
+select 'orders referencing a missing product' as check_name,
+  count(*) as missing_product_references
+from (
+  select distinct it ->> 'productId' as product_id
+  from public.orders o, jsonb_array_elements(o.items) it
+  where o.created_at > now() - interval '90 days'
+    and not exists (select 1 from public.products p where p.id = it ->> 'productId')
+) missing;
+
+-- 10. The same check for the whole catalogue the storefront can sell.
+select 'sellable products missing from the catalogue' as check_name,
+  count(*) as missing
+from public.products p
+where p.status = 'Active'
+  and not exists (select 1 from public.products c where c.id = p.id);
+
+-- ---------------------------------------------------------------------------
+-- CHECKS for migrations 0011 and 0013
+-- ---------------------------------------------------------------------------
+-- 11. The Printify contract columns exist (0011).
+select 'printify contract columns' as check_name,
+  exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'printify_products' and column_name = 'options')
+  and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'printify_products' and column_name = 'image_urls')
+  and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'printify_variant_map' and column_name = 'source')
+  and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'printify_credentials' and column_name = 'expires_at') as ok;
+
+-- 12. The browser cannot write the Printify tables (0013).
+--     Any row here means the old, looser grant is still live.
+select 'browser cannot write printify tables' as check_name,
+  not has_table_privilege('authenticated', 'public.order_fulfilment', 'INSERT')
+  and not has_table_privilege('authenticated', 'public.printify_settings', 'UPDATE')
+  and not has_table_privilege('authenticated', 'public.printify_shipments', 'DELETE') as ok;
+
+-- 13. The admin-only override RPC exists and is executable by a signed-in admin.
+select 'variant override RPC' as check_name,
+  has_function_privilege('authenticated', 'public.set_printify_variant_override(text,text,text,integer,boolean)', 'execute') as ok;
+
+-- 14. The token table is still unreachable from the browser.
+--     RLS enabled with no policies is the point: any anon/authenticated
+--     SELECT returns an empty set rather than an error that would confirm
+--     the row exists.
+select 'token table unreachable from the browser' as check_name,
+  not has_table_privilege('anon', 'public.printify_credentials', 'SELECT')
+  and not has_table_privilege('authenticated', 'public.printify_credentials', 'SELECT') as ok;
+
